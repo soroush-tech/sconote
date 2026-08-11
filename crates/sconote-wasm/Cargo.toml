@@ -1,0 +1,16 @@
+[package]
+name = "sconote-wasm"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sconote-core = { path = "../sconote-core" }
+sconote-poly = { path = "../sconote-poly" }
+wasm-bindgen = "0.2.127"
+
+# Not used directly: tract-onnx-opl → rand → getrandom, which refuses to
+# compile for wasm32-unknown-unknown unless its JS entropy backend is on.
+getrandom = { version = "0.2", features = ["js"] }

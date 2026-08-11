@@ -1,0 +1,21 @@
+{
+  "name": "@sconote/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "wasm-pack build of sconote-wasm, consumed by web apps in this workspace",
+  "files": ["dist"],
+  "types": "./dist/sconote.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/sconote.d.ts",
+      "default": "./dist/sconote.js"
+    }
+  },
+  "scripts": {
+    "build": "wasm-pack build ../../crates/sconote-wasm --target web --out-dir ../../packages/sconote-web/dist --out-name sconote --no-pack"
+  },
+  "devDependencies": {
+    "wasm-pack": "^0.13.1"
+  }
+}

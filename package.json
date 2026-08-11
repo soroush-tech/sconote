@@ -1,0 +1,13 @@
+{
+  "name": "sconote",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "dev": "turbo run dev"
+  },
+  "devDependencies": {
+    "turbo": "^2"
+  }
+}

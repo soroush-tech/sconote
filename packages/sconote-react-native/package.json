@@ -1,0 +1,133 @@
+{
+  "name": "@sconote/react-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React Native bindings for sconote (UniFFI/JSI)",
+  "main": "./lib/module/index.js",
+  "types": "./lib/typescript/src/index.d.ts",
+  "exports": {
+    ".": {
+      "sconote-sconote-source": "./src/index.tsx",
+      "types": "./lib/typescript/src/index.d.ts",
+      "default": "./lib/module/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "android",
+    "ios",
+    "cpp",
+    "*.podspec",
+    "react-native.config.js",
+    "!ios/build",
+    "!android/build",
+    "!android/gradle",
+    "!android/gradlew",
+    "!android/gradlew.bat",
+    "!android/local.properties",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "ubrn:android": "ubrn build android --and-generate",
+    "ubrn:ios": "ubrn build ios --and-generate",
+    "ubrn:clean": "del-cli cpp android/CMakeLists.txt android/src/main/java \"android/*.cpp\" ios \"src/Native*\" \"src/index.*\" src/generated",
+    "clean": "del-cli android/build ios/build lib",
+    "prepack": "bob build",
+    "typecheck": "tsc",
+    "test": "jest"
+  },
+  "keywords": [
+    "react-native",
+    "ios",
+    "android"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masoud-soroush/sconote.git"
+  },
+  "author": "Masoud Soroush <masoud.s.geo@gmail.com> (https://github.com/masoud-soroush)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/masoud-soroush/sconote/issues"
+  },
+  "homepage": "https://github.com/masoud-soroush/sconote#readme",
+  "dependencies": {
+    "@ubjs/core": "0.31.0-3",
+    "uniffi-bindgen-react-native": "0.31.0-3"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@react-native-community/cli": "20.1.0",
+    "@react-native/babel-preset": "0.85.0",
+    "@react-native/jest-preset": "0.85.0",
+    "@types/react": "^19.2.0",
+    "del-cli": "^7.0.0",
+    "jest": "^29.7.0",
+    "react": "19.2.3",
+    "react-native": "0.85.0",
+    "react-native-builder-bob": "^0.43.0",
+    "typescript": "^6.0.3"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      [
+        "module",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ],
+      "codegen"
+    ]
+  },
+  "codegenConfig": {
+    "name": "SconoteSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "outputDir": {
+      "ios": "ios/generated",
+      "android": "android/generated"
+    },
+    "android": {
+      "javaPackageName": "com.sconote.sconote"
+    },
+    "includesGeneratedCode": true
+  },
+  "jest": {
+    "preset": "@react-native/jest-preset",
+    "testEnvironmentOptions": {
+      "customExportConditions": [
+        "require",
+        "react-native",
+        "sconote-sconote-source"
+      ]
+    },
+    "modulePathIgnorePatterns": [
+      "<rootDir>/lib/"
+    ]
+  },
+  "create-react-native-library": {
+    "type": "turbo-module",
+    "languages": "cpp",
+    "tools": [
+      "jest"
+    ],
+    "version": "0.63.0"
+  }
+}

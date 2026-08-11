@@ -1,0 +1,14 @@
+[package]
+name = "sconote-ffi"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+sconote-core = { path = "../sconote-core" }
+# Pinned to the uniffi version that uniffi-bindgen-react-native 0.31.x
+# generates against — keep the two in lockstep when upgrading.
+uniffi = "0.31.0"
+sconote-poly = { path = "../sconote-poly" }

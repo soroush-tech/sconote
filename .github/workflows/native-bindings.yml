@@ -1,0 +1,65 @@
+name: native-bindings
+
+# Builds the @sconote/react-native native artifacts. These cannot be built on
+# the Windows dev machine — Android needs the NDK toolchain (Linux/macOS) and
+# iOS needs Xcode (macOS).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "packages/sconote-react-native/**"
+      - ".github/workflows/native-bindings.yml"
+  pull_request:
+    paths:
+      - "crates/**"
+      - "packages/sconote-react-native/**"
+      - ".github/workflows/native-bindings.yml"
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - run: cargo install cargo-ndk
+      - run: pnpm install
+      - name: Generate bindings and build Android libraries
+        run: pnpm --filter @sconote/react-native ubrn:android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sconote-android
+          path: packages/sconote-react-native/android/
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - run: pnpm install
+      - name: Generate bindings and build iOS xcframework
+        run: pnpm --filter @sconote/react-native ubrn:ios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sconote-ios
+          path: |
+            packages/sconote-react-native/ios/
+            packages/sconote-react-native/build/

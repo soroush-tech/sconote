@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
+# pnpm 10 blocks dependency postinstall scripts unless allowlisted.
+# wasm-pack's npm package downloads its prebuilt binary in postinstall;
+# esbuild (vite) uses postinstall to swap in its native binary.
+onlyBuiltDependencies:
+  - wasm-pack
+  - esbuild

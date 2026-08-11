@@ -1,0 +1,7 @@
+[package]
+name = "sconote-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+pitch-detection = "0.3.0"

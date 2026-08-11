@@ -1,0 +1,7 @@
+---
+# uniffi-bindgen-react-native configuration.
+# The Rust workspace sits two levels up; bindings are generated from the
+# sconote-ffi crate. Android/iOS sections use ubrn defaults.
+rust:
+  directory: ../..
+  manifestPath: crates/sconote-ffi/Cargo.toml

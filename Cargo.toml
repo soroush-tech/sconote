@@ -1,0 +1,39 @@
+[workspace]
+members = [
+    "crates/sconote-core",
+    "crates/sconote-wasm",
+    "crates/sconote-ffi",
+    "crates/sconote-poly",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+# Build scripts/proc macros at opt-level 1: also gives their binaries
+# different content hashes than the opt-0 builds Smart App Control had
+# blocked (os error 4551) — a fresh hash gets a fresh verdict.
+[profile.dev.build-override]
+opt-level = 1
+
+# Optimize tract in dev builds: its inference kernels are unusably slow at
+# opt-level 0. Scoped to these packages only — a wildcard override would
+# recompile every dependency, and Smart App Control blocks the freshly
+# built uniffi-tree proc-macro DLLs (os error 4551).
+[profile.dev.package.tract-core]
+opt-level = 2
+[profile.dev.package.tract-linalg]
+opt-level = 2
+[profile.dev.package.tract-data]
+opt-level = 2
+[profile.dev.package.tract-onnx]
+opt-level = 2
+[profile.dev.package.tract-hir]
+opt-level = 2
+
+[profile.release]
+opt-level = "s"      # Optimize for small binary size across WASM and mobile
+lto = true
+codegen-units = 1
+panic = "abort"

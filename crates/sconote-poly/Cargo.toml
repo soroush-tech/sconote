@@ -1,0 +1,15 @@
+[package]
+name = "sconote-poly"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+hound = "3.5"
+# No default features: "parallel" pulls rayon, which panics on wasm32
+# (no threads) — and this crate must stay WASM-clean.
+midly = { version = "0.5", default-features = false, features = ["alloc", "std"] }
+thiserror = "2"
+tract-onnx = "0.21"
+
+[dev-dependencies]
+sconote-core = { path = "../sconote-core" }
