@@ -12,3 +12,4 @@ sconote-core = { path = "../sconote-core" }
 # generates against — keep the two in lockstep when upgrading.
 uniffi = "0.31.0"
 sconote-poly = { path = "../sconote-poly" }
+thiserror = "2"

@@ -8,6 +8,8 @@ hound = "3.5"
 # No default features: "parallel" pulls rayon, which panics on wasm32
 # (no threads) — and this crate must stay WASM-clean.
 midly = { version = "0.5", default-features = false, features = ["alloc", "std"] }
+# MP3 only — every other container/codec stays out of the wasm binary.
+symphonia = { version = "0.5", default-features = false, features = ["mp3"] }
 thiserror = "2"
 tract-onnx = "0.21"
 

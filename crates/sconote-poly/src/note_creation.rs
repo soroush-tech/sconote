@@ -7,17 +7,66 @@
 //! for notes whose onsets the network missed. The thresholds here are the
 //! main tuning knobs against real recordings.
 //!
+//! Five documented deviations from the reference: re-articulating a
+//! sounding pitch takes a peak the network itself saw
+//! ([`NoteCreationOptions::retrigger_onset_threshold`]) that is not
+//! explained by a simultaneous strike an octave or twelfth above
+//! ([`NoteCreationOptions::retrigger_octave_veto`]), the melodia pass drops
+//! subharmonic shadows of already-claimed notes ([`is_subharmonic_ghost`]),
+//! onset-started notes get the same filter with an energy test on top
+//! ([`NoteCreationOptions::onset_ghost_energy_ratio`]), and finished notes
+//! that are the weak 2nd/3rd harmonic of a note below are dropped
+//! ([`NoteCreationOptions::overtone_ghost_energy_ratio`]).
+//!
 //! All matrices are row-major `[frame][pitch]` with [`PITCH_BINS`] columns.
 
 use crate::model::PITCH_BINS;
 
-/// Tuning knobs, defaults per Basic Pitch's reference implementation.
+/// How far back a pitch must have been sounding without interruption for an
+/// onset peak to count as re-articulating it rather than starting it fresh
+/// (4 frames ≈ 46 ms).
+const RETRIGGER_LOOKBACK_FRAMES: usize = 4;
+
+/// Tuning knobs, defaults per Basic Pitch's reference implementation except
+/// where a field's own docs say otherwise.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NoteCreationOptions {
     /// Minimum onset-peak probability that starts a note.
     pub onset_threshold: f32,
+    /// Minimum onset-peak probability to start a note at a pitch that is
+    /// *already sounding*. Not in Basic Pitch, which uses one threshold
+    /// everywhere: under a dense chord a held note's probability ripples,
+    /// and any resulting weak peak cuts it into two notes, because peaks are
+    /// claimed newest-first and the later one takes the tail. Requiring a
+    /// struck-string peak to re-articulate suppresses that without raising
+    /// the bar for notes starting out of silence.
+    ///
+    /// The bar applies to the network's *own* onset probability: onsets
+    /// inferred from frame-energy rises (see
+    /// [`NoteCreationOptions::infer_onsets`]) may start notes out of
+    /// silence, but a frame-energy ripple under a dense texture must never
+    /// cut a held note in two.
+    pub retrigger_onset_threshold: f32,
     /// Minimum frame probability for a pitch to count as still sounding.
     pub frame_threshold: f32,
+    /// Veto a re-articulation of a sounding pitch when the network's onset
+    /// at the octave or twelfth above (within ±2 frames) is at least this
+    /// factor times the candidate's own — the strike above explains the
+    /// ripple. `0` disables the veto.
+    pub retrigger_octave_veto: f32,
+    /// Drop onset-started notes whose span is covered by a note 12 or 19
+    /// semitones above, when the candidate's mean frame energy is at most
+    /// this factor times the upper note's — subharmonic leakage is much
+    /// weaker than its source, while a genuinely doubled bass octave holds
+    /// its own. `0` disables the filter.
+    pub onset_ghost_energy_ratio: f32,
+    /// The mirror image for real recordings: drop notes whose span is
+    /// covered by a note 12 or 19 semitones *below*, when the candidate's
+    /// mean frame energy is at most this factor times the lower note's — a
+    /// piano string's 2nd/3rd harmonic transcribed as its own note. Runs
+    /// after all notes exist, so it also catches mined ones. `0` disables
+    /// the filter.
+    pub overtone_ghost_energy_ratio: f32,
     /// Notes must span strictly more frames than this (11 ≈ 128 ms).
     pub min_note_len_frames: usize,
     /// Consecutive sub-threshold frames tolerated inside a note.
@@ -32,11 +81,30 @@ impl Default for NoteCreationOptions {
     fn default() -> NoteCreationOptions {
         NoteCreationOptions {
             onset_threshold: 0.5,
+            // Swept on a rendered Bach 846 against its own MIDI: 0.6 halves
+            // the re-triggers, 0.7 is the F1 peak (0.81 → 0.92, recall
+            // unchanged), 0.8+ starts eating genuine repeated notes.
+            retrigger_onset_threshold: 0.7,
             // Basic Pitch's reference default. Tuning on real room
             // recordings showed 0.2 buys ~0.01 F1 there but costs ~0.08 on
             // clean audio — not worth changing; lower it per-recording for
             // noisy rooms instead.
             frame_threshold: 0.3,
+            // Swept on the rendered Bach 846: 0.8 is the knee — precision
+            // 0.888 → 0.905 for one lost matched note; 1.0 buys a little
+            // more F1 but starts calling equal-loudness octave doublings
+            // ghosts. 0 disables the filter.
+            onset_ghost_energy_ratio: 0.8,
+            // Swept on both test recordings: 0.6 is the knee on each — the
+            // real-piano MP3 gains 6.7 points of precision (0.883 → 0.950)
+            // for 0.7 recall, the clean render gains 2 for 1; 0.8+ eats
+            // genuine octave-above voices on both.
+            overtone_ghost_energy_ratio: 0.6,
+            // Swept on the rendered Bach 846: 1.0 is the F1 peak (0.932 →
+            // 0.943, splits 89 → 63) at a cost of 4 matched notes; 1.25
+            // keeps recall exactly but only reaches 0.915 precision; 0.75
+            // and below eat real repeated notes wholesale.
+            retrigger_octave_veto: 1.0,
             min_note_len_frames: 11,
             energy_tolerance_frames: 11,
             infer_onsets: true,
@@ -60,6 +128,7 @@ pub fn notes_from_activations(
     n_frames: usize,
     options: &NoteCreationOptions,
 ) -> Vec<RawNote> {
+    let raw_onsets = onsets;
     let onsets = if options.infer_onsets {
         inferred_onsets(onsets, frames, n_frames)
     } else {
@@ -74,8 +143,17 @@ pub fn notes_from_activations(
     let mut peaks = Vec::new();
     for frame in 1..n_frames.saturating_sub(1) {
         for bin in 0..PITCH_BINS {
-            let value = onsets[frame * PITCH_BINS + bin];
-            if value >= options.onset_threshold
+            let index = frame * PITCH_BINS + bin;
+            let value = onsets[index];
+            // A sounding pitch re-articulates only on the network's own
+            // onset; a fresh note may also start from an inferred rise.
+            let admitted = if still_sounding(frames, frame, bin, options.frame_threshold) {
+                raw_onsets[index] >= options.retrigger_onset_threshold
+                    && !upper_strike_veto(raw_onsets, frame, bin, n_frames, options)
+            } else {
+                value >= options.onset_threshold
+            };
+            if admitted
                 && value > onsets[(frame - 1) * PITCH_BINS + bin]
                 && value > onsets[(frame + 1) * PITCH_BINS + bin]
             {
@@ -112,10 +190,118 @@ pub fn notes_from_activations(
         });
     }
 
+    if options.onset_ghost_energy_ratio > 0.0 {
+        suppress_onset_ghosts(&mut notes, frames, options.onset_ghost_energy_ratio);
+    }
     if options.melodia_trick {
         mine_remaining_energy(&mut remaining, n_frames, options, &mut notes);
     }
+    if options.overtone_ghost_energy_ratio > 0.0 {
+        suppress_overtone_ghosts(&mut notes, frames, options.overtone_ghost_energy_ratio);
+    }
     notes
+}
+
+/// Drop notes that are the transcribed 2nd/3rd harmonic of a note an octave
+/// or twelfth below: span covered at least half by the lower note, and mean
+/// frame energy at most `max_energy_ratio` times the lower note's over the
+/// overlap. Runs on the finished note list (onset-started and mined alike);
+/// a genuine octave-above voice keeps its own energy and survives.
+fn suppress_overtone_ghosts(notes: &mut Vec<RawNote>, frames: &[f32], max_energy_ratio: f32) {
+    let mean_energy = |bin: usize, start: usize, end: usize| {
+        if end <= start {
+            return 0.0;
+        }
+        (start..end).map(|f| frames[f * PITCH_BINS + bin]).sum::<f32>() / (end - start) as f32
+    };
+    let ghost = |candidate: &RawNote, all: &[RawNote]| {
+        all.iter().any(|lower| {
+            GHOST_INTERVALS
+                .iter()
+                .any(|&interval| candidate.pitch_bin == lower.pitch_bin + interval)
+                && {
+                    let overlap_start = lower.start_frame.max(candidate.start_frame);
+                    let overlap_end = lower.end_frame.min(candidate.end_frame);
+                    2 * overlap_end.saturating_sub(overlap_start)
+                        >= candidate.end_frame - candidate.start_frame
+                        && mean_energy(
+                            candidate.pitch_bin,
+                            candidate.start_frame,
+                            candidate.end_frame,
+                        ) <= max_energy_ratio
+                            * mean_energy(lower.pitch_bin, overlap_start, overlap_end)
+                }
+        })
+    };
+    let ghosts: Vec<bool> = notes.iter().map(|note| ghost(note, notes)).collect();
+    let mut index = 0;
+    notes.retain(|_| {
+        let drop = ghosts[index];
+        index += 1;
+        !drop
+    });
+}
+
+/// Did the network fire at least `retrigger_octave_veto` times as strongly
+/// at the octave or twelfth above within ±2 frames of this onset? If so the
+/// strike above explains the ripple at this pitch.
+fn upper_strike_veto(
+    raw_onsets: &[f32],
+    frame: usize,
+    bin: usize,
+    n_frames: usize,
+    options: &NoteCreationOptions,
+) -> bool {
+    if options.retrigger_octave_veto <= 0.0 {
+        return false;
+    }
+    let bar = options.retrigger_octave_veto * raw_onsets[frame * PITCH_BINS + bin];
+    let window = frame.saturating_sub(2)..=(frame + 2).min(n_frames - 1);
+    GHOST_INTERVALS.iter().any(|&interval| {
+        let upper = bin + interval;
+        upper < PITCH_BINS
+            && window
+                .clone()
+                .any(|f| raw_onsets[f * PITCH_BINS + upper] >= bar)
+    })
+}
+
+/// The onset-pass counterpart of [`is_subharmonic_ghost`], with an energy
+/// test on top of span coverage so genuine octave doublings — whose bass is
+/// comparably loud — survive while leaked subharmonics do not.
+fn suppress_onset_ghosts(notes: &mut Vec<RawNote>, frames: &[f32], max_energy_ratio: f32) {
+    let mean_energy = |bin: usize, start: usize, end: usize| {
+        if end <= start {
+            return 0.0;
+        }
+        (start..end).map(|f| frames[f * PITCH_BINS + bin]).sum::<f32>() / (end - start) as f32
+    };
+    let ghost = |candidate: &RawNote, all: &[RawNote]| {
+        all.iter().any(|upper| {
+            GHOST_INTERVALS
+                .iter()
+                .any(|&interval| upper.pitch_bin == candidate.pitch_bin + interval)
+                && {
+                    let overlap_start = upper.start_frame.max(candidate.start_frame);
+                    let overlap_end = upper.end_frame.min(candidate.end_frame);
+                    2 * overlap_end.saturating_sub(overlap_start)
+                        >= candidate.end_frame - candidate.start_frame
+                        && mean_energy(
+                            candidate.pitch_bin,
+                            candidate.start_frame,
+                            candidate.end_frame,
+                        ) <= max_energy_ratio
+                            * mean_energy(upper.pitch_bin, overlap_start, overlap_end)
+                }
+        })
+    };
+    let ghosts: Vec<bool> = notes.iter().map(|note| ghost(note, notes)).collect();
+    let mut index = 0;
+    notes.retain(|_| {
+        let drop = ghosts[index];
+        index += 1;
+        !drop
+    });
 }
 
 /// The "melodia trick": repeatedly take the loudest leftover cell and grow a
@@ -167,12 +353,52 @@ fn mine_remaining_energy(
         if end_frame.saturating_sub(start_frame) <= options.min_note_len_frames {
             continue;
         }
+        if is_subharmonic_ghost(notes, start_frame, end_frame, bin) {
+            continue;
+        }
         notes.push(RawNote {
             start_frame,
             end_frame,
             pitch_bin: bin,
         });
     }
+}
+
+/// Subharmonic intervals, in semitone bins, at which the network leaks frame
+/// salience below a loud note: the sub-octave (f/2) and sub-twelfth (f/3).
+const GHOST_INTERVALS: [usize; 2] = [12, 19];
+
+/// Is a candidate mined note the subharmonic shadow of a note already
+/// claimed? True when a note 12 or 19 semitones above covers at least half
+/// of the candidate's span — leaked salience mirrors the upper note's span,
+/// while a real bass line under a high voice keeps its own extent.
+fn is_subharmonic_ghost(
+    notes: &[RawNote],
+    start_frame: usize,
+    end_frame: usize,
+    bin: usize,
+) -> bool {
+    notes.iter().any(|note| {
+        GHOST_INTERVALS
+            .iter()
+            .any(|&interval| note.pitch_bin == bin + interval)
+            && {
+                let overlap = note
+                    .end_frame
+                    .min(end_frame)
+                    .saturating_sub(note.start_frame.max(start_frame));
+                2 * overlap >= end_frame - start_frame
+            }
+    })
+}
+
+/// Was this pitch already ringing in the frames leading up to `frame`? Uses
+/// the untouched frame matrix, not the energy left after earlier notes
+/// claimed theirs.
+fn still_sounding(frames: &[f32], frame: usize, bin: usize, frame_threshold: f32) -> bool {
+    frame >= RETRIGGER_LOOKBACK_FRAMES
+        && (frame - RETRIGGER_LOOKBACK_FRAMES..frame)
+            .all(|f| frames[f * PITCH_BINS + bin] >= frame_threshold)
 }
 
 fn zero_with_neighbors(remaining: &mut [f32], frame: usize, bin: usize) {

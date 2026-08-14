@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm --filter @sconote/web build && vite",
     "build": "vite build"
   },
   "dependencies": {
     "@sconote/web": "workspace:*",
-    "opensheetmusicdisplay": "^1.9.0"
+    "jspdf": "^4.2.1",
+    "verovio": "^6.2.0"
   },
   "devDependencies": {
     "vite": "^7"

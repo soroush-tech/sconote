@@ -109,6 +109,40 @@ impl NoteTracker {
     }
 }
 
+/// An uploaded file decoded to mono samples by the Rust decoders, so a
+/// given file produces identical samples in every browser (the platform
+/// `decodeAudioData` resamples to the device rate and differs per browser).
+#[wasm_bindgen]
+pub struct DecodedAudio {
+    samples: Vec<f32>,
+    sample_rate: u32,
+}
+
+#[wasm_bindgen]
+impl DecodedAudio {
+    #[wasm_bindgen(getter, js_name = sampleRate)]
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    /// Mono samples in [-1, 1].
+    pub fn samples(&self) -> Vec<f32> {
+        self.samples.clone()
+    }
+}
+
+/// Decode a WAV or MP3 file's bytes. Errors on any other format — fall
+/// back to the browser's decoder for those.
+#[wasm_bindgen(js_name = decodeAudio)]
+pub fn decode_audio(bytes: &[u8]) -> Result<DecodedAudio, JsError> {
+    let audio =
+        sconote_poly::read_audio_mono(bytes).map_err(|e| JsError::new(&e.to_string()))?;
+    Ok(DecodedAudio {
+        samples: audio.samples,
+        sample_rate: audio.sample_rate,
+    })
+}
+
 /// Offline polyphonic transcriber (the Basic Pitch CNN, embedded). Create
 /// once, reuse across recordings.
 #[wasm_bindgen]
@@ -171,12 +205,27 @@ impl TranscriptionJob {
             .map_err(|e| JsError::new(&e.to_string()))
     }
 
-    /// Extract the notes under the given thresholds (0.5 / 0.3 are the
-    /// reference defaults). Consumes the job.
+    /// Extract the notes under the given thresholds (0.5 / 0.3 / 0.7 / 0.8
+    /// / 1.0 / 0.6 are the defaults). The third is the bar an onset must
+    /// clear to re-articulate a pitch that is already sounding — lower it
+    /// for material with fast repeated notes. The fourth drops notes that
+    /// are the subharmonic shadow of a louder note an octave or twelfth
+    /// above (a note this much quieter, or less, is a ghost) — 0 disables
+    /// it, raise it toward 1 for a stricter cleanup. The fifth vetoes a
+    /// re-articulation whose onset is explained by a simultaneous strike an
+    /// octave or twelfth above at least this factor as strong — 0 disables
+    /// it, raise it above 1 to keep more repeated notes. The sixth drops
+    /// notes that are the weak 2nd/3rd harmonic of a note an octave or
+    /// twelfth below — the dominant spurious-note source on real
+    /// recordings; 0 disables it. Consumes the job.
     pub fn finish(
         &mut self,
         onset_threshold: f32,
         frame_threshold: f32,
+        retrigger_onset_threshold: f32,
+        onset_ghost_energy_ratio: f32,
+        retrigger_octave_veto: f32,
+        overtone_ghost_energy_ratio: f32,
     ) -> Result<TranscribedNotes, JsError> {
         let job = self
             .inner
@@ -185,6 +234,10 @@ impl TranscriptionJob {
         let options = NoteCreationOptions {
             onset_threshold,
             frame_threshold,
+            retrigger_onset_threshold,
+            onset_ghost_energy_ratio,
+            retrigger_octave_veto,
+            overtone_ghost_energy_ratio,
             ..NoteCreationOptions::default()
         };
         let notes = job.finish().to_notes(&options);
@@ -240,15 +293,15 @@ impl TranscribedNotes {
     }
 
     /// Render as a MusicXML score (single grand-staff part) for a sheet
-    /// music renderer. `bpm` omitted → estimated from the notes.
+    /// music renderer. `bpm` omitted → the beat is tracked through the
+    /// performance, so rubato and ritardandi notate on the right beats;
+    /// given → a fixed grid at that tempo.
     #[wasm_bindgen(js_name = toMusicXml)]
     pub fn to_music_xml(&self, bpm: Option<f64>) -> String {
-        let notes = self.notes();
-        let bpm = bpm.unwrap_or_else(|| sconote_poly::estimate_bpm(&notes));
         sconote_poly::parts_to_musicxml(
             &[sconote_poly::ScorePart {
                 name: "Piano".to_string(),
-                notes,
+                notes: self.notes(),
             }],
             bpm,
         )

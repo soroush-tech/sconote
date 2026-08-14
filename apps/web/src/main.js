@@ -1,6 +1,9 @@
-import init, { NoteTracker, Transcriber } from "@sconote/web";
-import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
+import init, { NoteTracker, Transcriber, decodeAudio } from "@sconote/web";
+import createVerovioModule from "verovio/wasm";
+import { VerovioToolkit } from "verovio/esm";
 import { encodeWavFloat32 } from "./wav-encoder.js";
+import { scoreToPdf } from "./score-pdf.js";
+import { yieldToEventLoop } from "./yield-to-event-loop.js";
 
 const WINDOW_SIZE = 2048;
 const IN_TUNE_CENTS = 5;
@@ -20,6 +23,8 @@ const summaryEl = document.getElementById("transcription-summary");
 const downloadWavButton = document.getElementById("download-wav");
 const downloadMidiButton = document.getElementById("download-midi");
 const downloadNotesButton = document.getElementById("download-notes");
+const downloadMusicXmlButton = document.getElementById("download-musicxml");
+const downloadPdfButton = document.getElementById("download-pdf");
 
 // While set: { chunks, sampleRate } accumulating the session.
 let recording = null;
@@ -67,9 +72,9 @@ async function transcribeRecording() {
     const percent = Math.round((100 * job.windowsDone) / total);
     transcribeButton.textContent = `Transcribing… ${percent}%`;
     // Yield to the event loop so the page (and the live tuner) stays alive.
-    await new Promise((resolve) => setTimeout(resolve));
+    await yieldToEventLoop();
   }
-  const notes = job.finish(0.5, 0.3);
+  const notes = job.finish(0.5, 0.3, 0.7, 0.8, 1.0, 0.6);
   job.free();
   lastTranscription = {
     midis: notes.midis(),
@@ -91,21 +96,37 @@ function noteName(midi) {
   return `${NOTE_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`;
 }
 
-// Engraving is delegated to OpenSheetMusicDisplay: the WASM core produces
-// MusicXML (quantization, key detection, grand staff) and OSMD draws it.
-let osmd = null;
+// Engraving is delegated to Verovio: the WASM core produces MusicXML
+// (quantization, key detection, grand staff) and Verovio typesets it into
+// A4 SVG pages — the same pages the PDF is built from.
+let verovio = null;
+// The raw SVG string per page from the last render, for the PDF.
+let scorePages = [];
 
 async function renderScore(musicXml) {
   scoreEl.replaceChildren();
-  // Must be visible (laid out) before render(): OSMD reads offsetWidth.
   scoreEl.hidden = false;
-  osmd = new OpenSheetMusicDisplay(scoreEl, {
-    autoResize: false,
-    drawTitle: false,
-    drawPartNames: false,
+  verovio ??= new VerovioToolkit(await createVerovioModule());
+  verovio.setOptions({
+    // A4 in Verovio units (tenths of a millimetre at scale 100).
+    pageWidth: 2100,
+    pageHeight: 2970,
+    scale: 40,
+    breaks: "auto",
+    header: "none",
+    footer: "none",
   });
-  await osmd.load(musicXml);
-  osmd.render();
+  verovio.loadData(musicXml);
+  scorePages = [];
+  for (let page = 1; page <= verovio.getPageCount(); page++) {
+    scorePages.push(verovio.renderToSVG(page));
+    const holder = document.createElement("div");
+    holder.innerHTML = scorePages.at(-1);
+    const svg = holder.firstElementChild;
+    svg.style.width = "100%";
+    svg.style.height = "auto";
+    scoreEl.append(svg);
+  }
 }
 
 async function renderTranscription({ midis, onsets, offsets, musicXml, bpm }) {
@@ -113,10 +134,12 @@ async function renderTranscription({ midis, onsets, offsets, musicXml, bpm }) {
   if (midis.length === 0) {
     scoreEl.replaceChildren();
     scoreEl.hidden = true;
+    downloadPdfButton.hidden = true;
     summaryEl.textContent = "no notes found";
     return;
   }
   await renderScore(musicXml);
+  downloadPdfButton.hidden = false;
   const duration = Math.max(...offsets);
   const low = Math.min(...midis) - 1;
   const high = Math.max(...midis) + 1;
@@ -161,6 +184,25 @@ downloadNotesButton.addEventListener("click", () => {
     "sconote-transcription.json",
     new Blob([JSON.stringify({ notes }, null, 2)], { type: "application/json" }),
   );
+});
+
+downloadMusicXmlButton.addEventListener("click", () => {
+  download(
+    "sconote-score.musicxml",
+    new Blob([lastTranscription.musicXml], { type: "application/vnd.recordare.musicxml+xml" }),
+  );
+});
+
+downloadPdfButton.addEventListener("click", () => {
+  downloadPdfButton.disabled = true;
+  scoreToPdf(scorePages)
+    .then((blob) => download("sconote-score.pdf", blob))
+    .catch((error) => {
+      summaryEl.textContent = String(error);
+    })
+    .finally(() => {
+      downloadPdfButton.disabled = false;
+    });
 });
 
 function render(event) {
@@ -241,14 +283,23 @@ async function loadAudioFile(file) {
   uploadButton.disabled = true;
   uploadButton.textContent = "Decoding…";
   await ensureWasm();
-  // decodeAudioData handles wav/mp3/ogg/… and hands back raw f32 samples.
-  const decoder = new AudioContext();
-  const buffer = await decoder.decodeAudioData(await file.arrayBuffer());
-  await decoder.close();
-  lastRecording = {
-    chunks: [buffer.getChannelData(0)],
-    sampleRate: buffer.sampleRate,
-  };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  try {
+    // WAV and MP3 decode in Rust, so a given file yields identical samples
+    // (and identical notes) in every browser and in the native tooling.
+    const decoded = decodeAudio(bytes);
+    lastRecording = { chunks: [decoded.samples()], sampleRate: decoded.sampleRate };
+    decoded.free();
+  } catch {
+    // Any other format (m4a/ogg/…): the browser decoder, pinned to the
+    // model's 22.05 kHz so the audio is resampled exactly once.
+    const decoder = new OfflineAudioContext(1, 1, 22050);
+    const buffer = await decoder.decodeAudioData(bytes.buffer);
+    lastRecording = {
+      chunks: [buffer.getChannelData(0)],
+      sampleRate: buffer.sampleRate,
+    };
+  }
   uploadButton.textContent = `Upload audio… (${file.name})`;
   uploadButton.disabled = false;
   transcribeButton.hidden = false;

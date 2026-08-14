@@ -101,6 +101,33 @@ impl NoteTracker {
     }
 }
 
+/// An audio file decoded to mono samples.
+#[derive(uniffi::Record)]
+pub struct DecodedAudio {
+    /// Mono samples in [-1, 1].
+    pub samples: Vec<f32>,
+    pub sample_rate: u32,
+}
+
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+#[uniffi(flat_error)]
+pub enum AudioDecodeError {
+    #[error("{0}")]
+    Invalid(String),
+}
+
+/// Decode a WAV or MP3 file's bytes. Errors on any other format — use the
+/// platform's decoder for those.
+#[uniffi::export]
+pub fn decode_audio_mono(bytes: Vec<u8>) -> Result<DecodedAudio, AudioDecodeError> {
+    let audio = sconote_poly::read_audio_mono(&bytes)
+        .map_err(|error| AudioDecodeError::Invalid(error.to_string()))?;
+    Ok(DecodedAudio {
+        samples: audio.samples,
+        sample_rate: audio.sample_rate,
+    })
+}
+
 /// One note from an offline polyphonic transcription.
 #[derive(uniffi::Record)]
 pub struct PolyphonicNote {
@@ -138,13 +165,35 @@ impl Transcriber {
     }
 
     /// Transcribe a whole mono recording (any sample rate) into notes,
-    /// sorted by onset. Thresholds 0.5 / 0.3 are the reference defaults.
+    /// sorted by onset. Thresholds 0.5 / 0.3 / 0.7 / 0.8 / 1.0 / 0.6 are
+    /// the defaults. The third is the bar an onset must clear to
+    /// re-articulate a pitch that is already sounding — lower it for
+    /// material with fast repeated notes. The fourth drops notes that are
+    /// the subharmonic shadow of a louder note an octave or twelfth above
+    /// (a note this much quieter, or less, is a ghost) — 0 disables it,
+    /// raise it toward 1 for a stricter cleanup. The fifth vetoes a
+    /// re-articulation whose onset is explained by a simultaneous strike an
+    /// octave or twelfth above at least this factor as strong — 0 disables
+    /// it, raise it above 1 to keep more repeated notes. The sixth drops
+    /// notes that are the weak 2nd/3rd harmonic of a note an octave or
+    /// twelfth below — the dominant spurious-note source on real
+    /// recordings; 0 disables it.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "mirrors the tuning knobs of NoteCreationOptions; a uniffi \
+                  Record would be nicer but is not worth regenerating the RN \
+                  bindings for before a mobile app exists"
+    )]
     pub fn transcribe(
         &self,
         samples: Vec<f32>,
         sample_rate: u32,
         onset_threshold: f32,
         frame_threshold: f32,
+        retrigger_onset_threshold: f32,
+        onset_ghost_energy_ratio: f32,
+        retrigger_octave_veto: f32,
+        overtone_ghost_energy_ratio: f32,
     ) -> Vec<PolyphonicNote> {
         let audio = sconote_poly::MonoAudio {
             samples,
@@ -153,6 +202,10 @@ impl Transcriber {
         let options = sconote_poly::NoteCreationOptions {
             onset_threshold,
             frame_threshold,
+            retrigger_onset_threshold,
+            onset_ghost_energy_ratio,
+            retrigger_octave_veto,
+            overtone_ghost_energy_ratio,
             ..sconote_poly::NoteCreationOptions::default()
         };
         sconote_poly::transcribe(&audio, &self.model, &options)
@@ -182,19 +235,19 @@ pub fn estimate_bpm(notes: Vec<PolyphonicNote>) -> f64 {
 }
 
 /// Render transcribed notes as a MusicXML score (single grand-staff part)
-/// for a sheet music renderer. `bpm` `None` → estimated from the notes.
+/// for a sheet music renderer. `bpm` `None` → the beat is tracked through
+/// the performance, so rubato and ritardandi notate on the right beats;
+/// `Some` → a fixed grid at that tempo.
 #[uniffi::export]
 pub fn notes_to_musicxml(
     notes: Vec<PolyphonicNote>,
     part_name: String,
     bpm: Option<f64>,
 ) -> String {
-    let notes = core_notes(&notes);
-    let bpm = bpm.unwrap_or_else(|| sconote_poly::estimate_bpm(&notes));
     sconote_poly::parts_to_musicxml(
         &[sconote_poly::ScorePart {
             name: part_name,
-            notes,
+            notes: core_notes(&notes),
         }],
         bpm,
     )

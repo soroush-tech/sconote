@@ -6,9 +6,11 @@
 //! ([`read_wav_mono`]), synthetic rendering ([`render_notes`]), and
 //! note-level scoring against a reference ([`score_notes`]).
 
+mod decode;
 mod ground_truth;
 mod midi_export;
 mod model;
+mod mp3;
 mod musicxml;
 mod note_creation;
 mod resample;
@@ -18,7 +20,9 @@ mod tempo;
 mod transcribe;
 mod wav;
 
+pub use decode::{AudioDecodeError, read_audio_mono};
 pub use ground_truth::{GroundTruthError, GroundTruthNote, notes_from_midi};
+pub use mp3::{Mp3Error, read_mp3_mono};
 pub use midi_export::notes_to_midi_bytes;
 pub use model::{
     BasicPitch, FFT_HOP, LOWEST_MIDI, MODEL_SAMPLE_RATE, ModelError, PITCH_BINS, WINDOW_FRAMES,
@@ -29,6 +33,6 @@ pub use note_creation::{NoteCreationOptions, RawNote, notes_from_activations};
 pub use resample::resample;
 pub use score::{ScoreReport, TranscribedNote, score_notes};
 pub use synth::render_notes;
-pub use tempo::{DEFAULT_BPM, estimate_bpm};
+pub use tempo::{DEFAULT_BPM, estimate_bpm, track_beats};
 pub use transcribe::{Activations, WindowedTranscription, compute_activations, transcribe};
 pub use wav::{MonoAudio, WavError, read_wav_mono};

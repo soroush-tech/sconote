@@ -5,6 +5,21 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@sconote/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      // This package's source is the Rust workspace, not its own directory.
+      // Without these inputs the cache key never changes when the DSP core
+      // does, and a stale wasm is served forever.
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/Cargo.toml",
+        "$TURBO_ROOT$/Cargo.lock",
+        "$TURBO_ROOT$/crates/**/*.rs",
+        "$TURBO_ROOT$/crates/**/Cargo.toml",
+        "$TURBO_ROOT$/crates/**/models/**"
+      ]
+    },
     "test": {
       "dependsOn": ["build"]
     },

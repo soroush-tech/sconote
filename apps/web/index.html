@@ -76,9 +76,8 @@
         background: #f7f4ea;
         border-radius: 8px;
         padding: 0.5rem 0;
-        /* OSMD engraves into the container's offsetWidth at render() time, so
-           the width must be definite (not content-derived: this is a centered
-           flex item, and the container is still empty when OSMD measures it). */
+        /* Verovio pages are width-100% SVGs, so the container needs a
+           definite width (this is a centered flex item that starts empty). */
         width: min(720px, 90vw);
         max-height: 45vh;
         overflow: auto;
@@ -117,6 +116,8 @@
         <button id="download-wav">Download WAV</button>
         <button id="download-notes">Download JSON</button>
         <button id="download-midi">Download MIDI</button>
+        <button id="download-musicxml">Download MusicXML</button>
+        <button id="download-pdf" hidden>Download PDF</button>
       </div>
       <canvas id="roll" width="720" height="240"></canvas>
       <div id="score" hidden></div>

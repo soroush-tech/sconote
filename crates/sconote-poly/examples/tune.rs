@@ -2,15 +2,14 @@
 //! ground truth (the recording starts at an unknown point in the song), and
 //! report note-level accuracy for a grid of thresholds.
 //!
-//! Usage: cargo run -p sconote-poly --example tune -- <session.wav> <file.mid>...
+//! Usage: cargo run -p sconote-poly --example tune -- <session.wav|mp3> <file.mid>...
 
 use std::collections::HashMap;
-use std::fs::File;
 use std::time::Instant;
 
 use sconote_poly::{
     BasicPitch, GroundTruthNote, NoteCreationOptions, TranscribedNote, compute_activations,
-    notes_from_midi, read_wav_mono, score_notes,
+    notes_from_midi, read_audio_mono, score_notes,
 };
 
 const ONSET_TOLERANCE_S: f64 = 0.15;
@@ -19,13 +18,14 @@ const EDGE_MARGIN_S: f64 = 0.5;
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let wav_path = args
+    let audio_path = args
         .next()
-        .expect("usage: tune <session.wav> <file.mid>...");
+        .expect("usage: tune <session.wav|mp3> <file.mid>...");
     let midi_paths: Vec<String> = args.collect();
     assert!(!midi_paths.is_empty(), "give at least one MIDI file");
 
-    let audio = read_wav_mono(File::open(&wav_path).expect("open wav")).expect("decode wav");
+    let audio =
+        read_audio_mono(&std::fs::read(&audio_path).expect("read audio")).expect("decode audio");
     let duration_s = audio.samples.len() as f64 / f64::from(audio.sample_rate);
     println!("recording: {duration_s:.1} s at {} Hz", audio.sample_rate);
 
@@ -83,6 +83,28 @@ fn main() {
                 grid_best = (report.f1(), options);
             }
         }
+    }
+
+    // The overtone-ghost filter, swept alone on top of the defaults.
+    println!(
+        "\n{:<14} {:>6} {:>7} {:>9} {:>9} {:>7}",
+        "overtone", "pred", "match", "precision", "recall", "f1"
+    );
+    for overtone_ghost_energy_ratio in [0.0_f32, 0.4, 0.6, 0.8, 1.0] {
+        let options = NoteCreationOptions {
+            overtone_ghost_energy_ratio,
+            ..NoteCreationOptions::default()
+        };
+        let notes = activations.to_notes(&options);
+        let report = score_clip(&reference, &notes, offset, duration_s);
+        println!(
+            "{overtone_ghost_energy_ratio:<14.2} {:>6} {:>7} {:>9.3} {:>9.3} {:>7.3}",
+            notes.len(),
+            report.matched,
+            report.precision(),
+            report.recall(),
+            report.f1()
+        );
     }
 
     // Detail at the best setting: what is missed, per octave.

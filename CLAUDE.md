@@ -81,7 +81,7 @@ cargo build -p sconote-wasm --target wasm32-unknown-unknown   # verify WASM-clea
 cargo llvm-cov --workspace                              # coverage (rule 6)
 pnpm install                                            # JS deps (incl. wasm-pack binary)
 pnpm build                                              # turbo: wasm-pack → vite
-pnpm dev --filter web                                   # tuner app at localhost:5173 (turbo builds @sconote/web first)
+pnpm dev --filter web                                   # tuner app at localhost:5173 (rebuilds the wasm first, ~25 s)
 ```
 
 ## Architecture
