@@ -44,7 +44,7 @@ fn transcribes_rendered_full_band_opening_with_usable_accuracy() {
         report.recall(),
         report.f1(),
     );
-    // Currently scores ≈0.74 (precision 0.66, recall 0.85); the margin
+    // Currently scores ≈0.84 (precision 0.90, recall 0.80); the margin
     // below guards against regressions without being flaky.
-    assert!(report.f1() > 0.65, "f1 regressed: {:.3}", report.f1());
+    assert!(report.f1() > 0.75, "f1 regressed: {:.3}", report.f1());
 }

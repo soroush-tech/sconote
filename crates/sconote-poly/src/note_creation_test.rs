@@ -20,6 +20,7 @@ fn plain_options() -> NoteCreationOptions {
         onset_ghost_energy_ratio: 0.0,
         overtone_ghost_energy_ratio: 0.0,
         retrigger_octave_veto: 0.0,
+        retrigger_dip_ratio: 0.0,
         ..NoteCreationOptions::default()
     }
 }
@@ -46,7 +47,7 @@ fn note_shorter_than_minimum_is_dropped() {
     let mut onsets = matrix();
     let mut frames = matrix();
     onsets[10 * PITCH_BINS + 40] = 0.9;
-    set(&mut frames, 10..18, 40, 0.8); // 8 frames < min_note_len 11
+    set(&mut frames, 10..16, 40, 0.8); // 6 frames < min_note_len 7
     let notes = notes_from_activations(&onsets, &frames, N_FRAMES, &plain_options());
     assert_eq!(notes, Vec::new());
 }
@@ -96,6 +97,50 @@ fn weak_onset_peak_does_not_split_a_sounding_note() {
             pitch_bin: 40
         }]
     );
+}
+
+#[test]
+fn energy_dip_admits_a_re_strike_at_the_plain_threshold() {
+    let mut onsets = matrix();
+    let mut frames = matrix();
+    onsets[10 * PITCH_BINS + 40] = 0.9;
+    onsets[30 * PITCH_BINS + 40] = 0.6; // under the strict bar, over the plain one
+    set(&mut frames, 10..55, 40, 0.8);
+    // The string decays just before the second strike — still above the
+    // frame threshold, so the pitch never stops "sounding".
+    set(&mut frames, 26..30, 40, 0.4);
+    let notes = notes_from_activations(
+        &onsets,
+        &frames,
+        N_FRAMES,
+        &NoteCreationOptions {
+            retrigger_dip_ratio: 0.7,
+            ..plain_options()
+        },
+    );
+    assert_eq!(notes.len(), 2);
+    assert_eq!(notes[0].start_frame, 30);
+    assert_eq!(notes[1].end_frame, 30);
+}
+
+#[test]
+fn flat_energy_keeps_the_strict_re_articulation_bar() {
+    let mut onsets = matrix();
+    let mut frames = matrix();
+    onsets[10 * PITCH_BINS + 40] = 0.9;
+    onsets[30 * PITCH_BINS + 40] = 0.6; // ripple, no decay before it
+    set(&mut frames, 10..55, 40, 0.8);
+    let notes = notes_from_activations(
+        &onsets,
+        &frames,
+        N_FRAMES,
+        &NoteCreationOptions {
+            retrigger_dip_ratio: 0.7,
+            ..plain_options()
+        },
+    );
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].end_frame, 55);
 }
 
 #[test]
@@ -378,6 +423,51 @@ fn a_real_octave_above_voice_survives_the_overtone_filter() {
     );
     assert_eq!(notes.len(), 2);
     assert!(notes.iter().any(|note| note.pitch_bin == 52));
+}
+
+#[test]
+fn weak_fifth_partial_two_octaves_and_a_third_up_is_dropped() {
+    let mut onsets = matrix();
+    let mut frames = matrix();
+    onsets[10 * PITCH_BINS + 40] = 0.9;
+    set(&mut frames, 10..40, 40, 0.8);
+    // The 5th partial lands 28 semitones up: own onset, mirrored span, a
+    // fraction of the energy.
+    onsets[10 * PITCH_BINS + 68] = 0.9;
+    set(&mut frames, 10..40, 68, 0.4);
+    let notes = notes_from_activations(
+        &onsets,
+        &frames,
+        N_FRAMES,
+        &NoteCreationOptions {
+            overtone_ghost_energy_ratio: 0.6,
+            ..plain_options()
+        },
+    );
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].pitch_bin, 40);
+}
+
+#[test]
+fn a_real_voice_two_octaves_and_a_third_up_survives_the_overtone_filter() {
+    let mut onsets = matrix();
+    let mut frames = matrix();
+    onsets[10 * PITCH_BINS + 40] = 0.9;
+    set(&mut frames, 10..40, 40, 0.8);
+    // A genuinely played upper voice carries its own energy.
+    onsets[10 * PITCH_BINS + 68] = 0.9;
+    set(&mut frames, 10..40, 68, 0.7);
+    let notes = notes_from_activations(
+        &onsets,
+        &frames,
+        N_FRAMES,
+        &NoteCreationOptions {
+            overtone_ghost_energy_ratio: 0.6,
+            ..plain_options()
+        },
+    );
+    assert_eq!(notes.len(), 2);
+    assert!(notes.iter().any(|note| note.pitch_bin == 68));
 }
 
 #[test]

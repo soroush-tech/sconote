@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use sconote_poly::{
-    BasicPitch, GroundTruthNote, NoteCreationOptions, TranscribedNote, compute_activations,
-    notes_from_midi, read_audio_mono, score_notes,
+    compute_activations, notes_from_midi, read_audio_mono, score_notes, BasicPitch,
+    GroundTruthNote, NoteCreationOptions, TranscribedNote,
 };
 
 const ONSET_TOLERANCE_S: f64 = 0.15;
@@ -105,6 +105,60 @@ fn main() {
             report.recall(),
             report.f1()
         );
+    }
+
+    // Minimum note length × overtone ratio: the two interact — a lower
+    // length gate recovers fast notes but lets in short ghosts the
+    // overtone filter must then catch.
+    println!(
+        "\n{:>7} {:>8} {:>6} {:>7} {:>9} {:>9} {:>7}",
+        "min_len", "overtone", "pred", "match", "precision", "recall", "f1"
+    );
+    for min_note_len_frames in [3_usize, 5, 7, 9, 11] {
+        for overtone_ghost_energy_ratio in [0.4_f32, 0.6, 0.8] {
+            let options = NoteCreationOptions {
+                min_note_len_frames,
+                overtone_ghost_energy_ratio,
+                ..NoteCreationOptions::default()
+            };
+            let notes = activations.to_notes(&options);
+            let report = score_clip(&reference, &notes, offset, duration_s);
+            println!(
+                "{min_note_len_frames:>7} {overtone_ghost_energy_ratio:>8.2} {:>6} {:>7} {:>9.3} {:>9.3} {:>7.3}",
+                notes.len(),
+                report.matched,
+                report.precision(),
+                report.recall(),
+                report.f1()
+            );
+        }
+    }
+
+    // Retrigger dip ratio × strict no-dip bar: the dip admits genuine
+    // re-strikes at the plain threshold, so the no-dip bar can afford to
+    // be stricter (1.1 means a re-articulation always needs a dip).
+    println!(
+        "\n{:>5} {:>7} {:>6} {:>7} {:>9} {:>9} {:>7}",
+        "dip", "bar", "pred", "match", "precision", "recall", "f1"
+    );
+    for retrigger_dip_ratio in [0.0_f32, 0.5, 0.6, 0.7, 0.8, 0.9] {
+        for retrigger_onset_threshold in [0.7_f32, 0.8, 0.9, 1.1] {
+            let options = NoteCreationOptions {
+                retrigger_dip_ratio,
+                retrigger_onset_threshold,
+                ..NoteCreationOptions::default()
+            };
+            let notes = activations.to_notes(&options);
+            let report = score_clip(&reference, &notes, offset, duration_s);
+            println!(
+                "{retrigger_dip_ratio:>5.2} {retrigger_onset_threshold:>7.2} {:>6} {:>7} {:>9.3} {:>9.3} {:>7.3}",
+                notes.len(),
+                report.matched,
+                report.precision(),
+                report.recall(),
+                report.f1()
+            );
+        }
     }
 
     // Detail at the best setting: what is missed, per octave.
