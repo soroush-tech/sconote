@@ -34,7 +34,7 @@ fn rendered_a4_lights_up_the_a4_note_bin() {
     let model = BasicPitch::new().expect("model loads");
     let prediction = model.predict(&window).expect("inference");
 
-    // Mean note probability over frames inside the note body (0.35 s–1.16 s
+    // Mean note probability over frames inside the note body (0.35 s-1.16 s
     // ≈ frames 30..100 at 86 fps).
     let bin_mean = |pitch_bin: usize| {
         (30..100)

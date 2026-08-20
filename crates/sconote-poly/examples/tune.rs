@@ -107,7 +107,7 @@ fn main() {
         );
     }
 
-    // Minimum note length × overtone ratio: the two interact — a lower
+    // Minimum note length × overtone ratio: the two interact - a lower
     // length gate recovers fast notes but lets in short ghosts the
     // overtone filter must then catch.
     println!(

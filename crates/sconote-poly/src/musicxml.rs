@@ -1,14 +1,14 @@
 //! Transcribed notes → MusicXML, the interchange format every engraving
-//! tool (OpenSheetMusicDisplay, MuseScore, …) renders as sheet music.
+//! tool (OpenSheetMusicDisplay, MuseScore, ...) renders as sheet music.
 //!
 //! The conversion makes the notation decisions a score needs beyond raw
-//! notes: onsets/durations quantize to a 16th grid on a beat time-line —
+//! notes: onsets/durations quantize to a 16th grid on a beat time-line -
 //! uniform at a caller-given tempo, or tracked through the performance's
-//! rubato by [`track_beats`] — with `<sound tempo>` marks emitted where the
+//! rubato by [`track_beats`] - with `<sound tempo>` marks emitted where the
 //! tracked tempo moves. A Krumhansl-style key detector picks the key
 //! signature (so B♭ material is spelled with flats, not A♯), and each part
 //! is a piano grand staff split at middle C. Time signature is fixed 4/4;
-//! notes are truncated at barlines rather than tied — a readable
+//! notes are truncated at barlines rather than tied - a readable
 //! approximation, not full engraving-grade rhythm transcription.
 
 use std::collections::BTreeMap;
@@ -78,14 +78,14 @@ pub fn parts_to_musicxml(parts: &[ScorePart], bpm: Option<f64>) -> String {
 }
 
 /// Fold a tracked pulse down to a quarter-note range for barring. The
-/// tracker often locks onto the eighth-note pulse — right for alignment,
+/// tracker often locks onto the eighth-note pulse - right for alignment,
 /// but notated as-is it would halve every measure and double every note
 /// value.
 ///
 /// The decision is regional: each pass halves the pulse wherever the
 /// *smoothed* local tempo (a ±8-beat window, so single rubato beats don't
 /// flip it) still exceeds 115 BPM, until every region sits in the
-/// ~57–115 range a 4/4 quarter occupies. A sixteenth lock takes two
+/// ~57-115 range a 4/4 quarter occupies. A sixteenth lock takes two
 /// passes; the third confirms stability. A tempo-octave choice, never a
 /// timing change.
 fn fold_to_notation_pulse(beats: Vec<f64>) -> Vec<f64> {
@@ -225,7 +225,7 @@ fn part_measures(notes: &[TranscribedNote], beats: &[f64]) -> String {
 }
 
 /// A note is a *hold* when it is long (at least a beat and a half) and at
-/// least two other notes of its staff strike while it sounds — the held
+/// least two other notes of its staff strike while it sounds - the held
 /// bass of an arpeggiated figure, a fugue subject's long tones. Ring-out
 /// alone does not qualify: transcribed offsets are release times, so short
 /// notes routinely bleed over their neighbors.
@@ -482,7 +482,7 @@ const MAJOR_PROFILE: [f64; 12] = [
 const MINOR_PROFILE: [f64; 12] = [
     6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
 ];
-/// Key-signature fifths for each major tonic pitch class (C, D♭, D, …).
+/// Key-signature fifths for each major tonic pitch class (C, D♭, D, ...).
 const MAJOR_FIFTHS: [i32; 12] = [0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5];
 
 /// Detect the key signature: correlate the duration-weighted pitch-class

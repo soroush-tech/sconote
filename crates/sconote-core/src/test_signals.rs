@@ -11,7 +11,7 @@ pub(crate) fn sine(frequency_hz: f32, samples: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Deterministic full-scale white noise (tiny LCG — keeps tests reproducible
+/// Deterministic full-scale white noise (tiny LCG - keeps tests reproducible
 /// without a rand dependency).
 pub(crate) fn noise(samples: usize) -> Vec<f32> {
     let mut state: u32 = 0x02F6_E2B1;

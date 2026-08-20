@@ -1,0 +1,3 @@
+rules = ["invisible", "punctuation", "mojibake"]
+# Claude skill files are prompt material, not published prose.
+exclude = [".claude/**"]

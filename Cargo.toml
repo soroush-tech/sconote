@@ -13,12 +13,12 @@ edition = "2024"
 
 # Build scripts/proc macros at opt-level 1: also gives their binaries
 # different content hashes than the opt-0 builds Smart App Control had
-# blocked (os error 4551) — a fresh hash gets a fresh verdict.
+# blocked (os error 4551) - a fresh hash gets a fresh verdict.
 [profile.dev.build-override]
 opt-level = 1
 
 # Optimize tract in dev builds: its inference kernels are unusably slow at
-# opt-level 0. Scoped to these packages only — a wildcard override would
+# opt-level 0. Scoped to these packages only - a wildcard override would
 # recompile every dependency, and Smart App Control blocks the freshly
 # built uniffi-tree proc-macro DLLs (os error 4551).
 [profile.dev.package.tract-core]

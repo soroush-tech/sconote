@@ -8,7 +8,7 @@ export default defineConfig({
     exclude: ["@sconote/web", "verovio"],
   },
   build: {
-    // Don't inline small assets as data: URLs — audioWorklet.addModule
+    // Don't inline small assets as data: URLs - audioWorklet.addModule
     // rejects them in some browsers (the worklet must stay a real file).
     assetsInlineLimit: 0,
   },

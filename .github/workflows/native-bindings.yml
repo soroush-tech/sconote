@@ -1,7 +1,7 @@
 name: native-bindings
 
 # Builds the @sconote/react-native native artifacts. These cannot be built on
-# the Windows dev machine — Android needs the NDK toolchain (Linux/macOS) and
+# the Windows dev machine - Android needs the NDK toolchain (Linux/macOS) and
 # iOS needs Xcode (macOS).
 
 on:

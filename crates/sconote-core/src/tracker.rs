@@ -8,7 +8,7 @@
 
 use crate::{NoteEvent, PitchEngine};
 
-/// Minimum clarity for a window to count toward a tracked note — stricter
+/// Minimum clarity for a window to count toward a tracked note - stricter
 /// than the engine's detection threshold, so borderline windows still show
 /// on a tuner but never enter the note history.
 const MIN_TRACK_CLARITY: f32 = 0.8;
@@ -22,10 +22,10 @@ const HOLD_WINDOWS: u32 = 3;
 #[derive(Debug, Clone, PartialEq)]
 pub struct TrackerUpdate {
     /// Raw per-window detection, exactly what [`PitchEngine::process`] would
-    /// have returned for this chunk — drive a live display with this.
+    /// have returned for this chunk - drive a live display with this.
     pub live: Option<NoteEvent>,
     /// Present at most once per held note: the pitch was stable for
-    /// [`HOLD_WINDOWS`] windows — append this to a note history.
+    /// [`HOLD_WINDOWS`] windows - append this to a note history.
     pub note_started: Option<NoteEvent>,
 }
 

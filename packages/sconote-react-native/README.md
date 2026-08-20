@@ -8,12 +8,12 @@ React Native bindings for the sconote pitch-detection core, generated from
 ## Generated code
 
 Everything under `src/`, `cpp/`, `android/`, `ios/` plus the podspec is
-**generated** and gitignored — never hand-edit it. To (re)generate bindings and
+**generated** and gitignored - never hand-edit it. To (re)generate bindings and
 build the native libraries:
 
 ```sh
-pnpm ubrn:android   # Linux/macOS — needs Android NDK + Rust android targets
-pnpm ubrn:ios       # macOS only — builds the xcframework
+pnpm ubrn:android   # Linux/macOS - needs Android NDK + Rust android targets
+pnpm ubrn:ios       # macOS only - builds the xcframework
 ```
 
 Neither works on Windows; CI (`.github/workflows/native-bindings.yml`) runs

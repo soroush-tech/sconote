@@ -5,7 +5,7 @@ use std::f64::consts::PI;
 
 use crate::wav::MonoAudio;
 
-/// Sinc lobes on each side of the kernel center — 12 gives ~80 dB of alias
+/// Sinc lobes on each side of the kernel center - 12 gives ~80 dB of alias
 /// rejection with a Hann window, far below the noise floor of a room
 /// recording.
 const KERNEL_LOBES: f64 = 12.0;

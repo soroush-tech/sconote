@@ -1,7 +1,7 @@
 //! Note-level scoring of a transcription against MIDI ground truth.
 //!
 //! A predicted note counts as correct when it has the reference note's exact
-//! MIDI pitch and its onset lies within a tolerance window — the standard
+//! MIDI pitch and its onset lies within a tolerance window - the standard
 //! note-level transcription metric (offsets are deliberately ignored; decay
 //! tails make them unreliable in real audio). Matching is greedy nearest-
 //! onset per reference note, in onset order.

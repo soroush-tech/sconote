@@ -5,7 +5,7 @@
 //! Chord-clustered onsets yield inter-onset intervals; the winning tempo is
 //! the beat period under which those intervals sit closest to whole numbers
 //! of beats. Tempo "octave" ambiguity (60 vs 120) is inherent to the
-//! problem, so candidates are confined to a musically likely range —
+//! problem, so candidates are confined to a musically likely range -
 //! misjudging the octave only changes notation granularity, not the notes.
 
 use crate::score::TranscribedNote;
@@ -80,7 +80,7 @@ pub fn estimate_bpm(notes: &[TranscribedNote]) -> f64 {
 /// as a fraction of the current beat period. Below half a period, so a
 /// subdivision halfway between beats is never mistaken for the beat.
 const BEAT_SNAP_WINDOW: f64 = 0.3;
-/// Weight of the newest inter-beat interval in the running period — caps
+/// Weight of the newest inter-beat interval in the running period - caps
 /// tempo drift at ~9% per beat while riding out one early or late onset.
 const PERIOD_BLEND: f64 = 0.3;
 

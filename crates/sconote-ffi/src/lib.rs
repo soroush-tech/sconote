@@ -63,9 +63,9 @@ impl PitchDetector {
 /// Result of feeding one chunk to [`NoteTracker::process`].
 #[derive(uniffi::Record)]
 pub struct TrackerUpdate {
-    /// Raw per-window detection — drive a live display (tuner) with this.
+    /// Raw per-window detection - drive a live display (tuner) with this.
     pub live: Option<NoteEvent>,
-    /// Present at most once per held note — append to a note history.
+    /// Present at most once per held note - append to a note history.
     pub note_started: Option<NoteEvent>,
 }
 
@@ -116,7 +116,7 @@ pub enum AudioDecodeError {
     Invalid(String),
 }
 
-/// Decode a WAV or MP3 file's bytes. Errors on any other format — use the
+/// Decode a WAV or MP3 file's bytes. Errors on any other format - use the
 /// platform's decoder for those.
 #[uniffi::export]
 pub fn decode_audio_mono(bytes: Vec<u8>) -> Result<DecodedAudio, AudioDecodeError> {
@@ -140,7 +140,7 @@ pub struct PolyphonicNote {
 }
 
 /// Offline polyphonic transcriber (the Basic Pitch CNN, embedded). Create
-/// once, reuse across recordings. Transcription is CPU-bound — call it from
+/// once, reuse across recordings. Transcription is CPU-bound - call it from
 /// a background thread/queue, not the UI thread.
 #[derive(uniffi::Object)]
 pub struct Transcriber {
@@ -167,16 +167,16 @@ impl Transcriber {
     /// Transcribe a whole mono recording (any sample rate) into notes,
     /// sorted by onset. Thresholds 0.5 / 0.3 / 0.7 / 0.8 / 1.0 / 0.6 are
     /// the defaults. The third is the bar an onset must clear to
-    /// re-articulate a pitch that is already sounding — lower it for
+    /// re-articulate a pitch that is already sounding - lower it for
     /// material with fast repeated notes. The fourth drops notes that are
     /// the subharmonic shadow of a louder note an octave or twelfth above
-    /// (a note this much quieter, or less, is a ghost) — 0 disables it,
+    /// (a note this much quieter, or less, is a ghost) - 0 disables it,
     /// raise it toward 1 for a stricter cleanup. The fifth vetoes a
     /// re-articulation whose onset is explained by a simultaneous strike an
-    /// octave or twelfth above at least this factor as strong — 0 disables
+    /// octave or twelfth above at least this factor as strong - 0 disables
     /// it, raise it above 1 to keep more repeated notes. The sixth drops
     /// notes that are the weak 2nd/3rd harmonic of a note an octave or
-    /// twelfth below — the dominant spurious-note source on real
+    /// twelfth below - the dominant spurious-note source on real
     /// recordings; 0 disables it.
     #[expect(
         clippy::too_many_arguments,
@@ -221,7 +221,7 @@ impl Transcriber {
     }
 }
 
-/// Encode transcribed notes as a Standard MIDI File (120 BPM grid) — save
+/// Encode transcribed notes as a Standard MIDI File (120 BPM grid) - save
 /// as `.mid`.
 #[uniffi::export]
 pub fn notes_to_midi(notes: Vec<PolyphonicNote>) -> Vec<u8> {

@@ -14,7 +14,7 @@ const VELOCITY: u8 = 90;
 /// Encode notes as a single-track MIDI file on a 120 BPM grid.
 pub fn notes_to_midi_bytes(notes: &[TranscribedNote]) -> Vec<u8> {
     let ticks_per_second = f64::from(TICKS_PER_QUARTER) * 1e6 / f64::from(TEMPO_US_PER_QN);
-    // (tick, is_note_on, midi) — offs sort before ons at the same tick so
+    // (tick, is_note_on, midi) - offs sort before ons at the same tick so
     // back-to-back repeats of a pitch stay two separate notes.
     let mut events: Vec<(u64, bool, u8)> = Vec::with_capacity(notes.len() * 2);
     for note in notes {

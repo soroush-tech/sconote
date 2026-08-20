@@ -1,4 +1,4 @@
-//! Basic Pitch CNN inference via tract (pure Rust — WASM/mobile friendly).
+//! Basic Pitch CNN inference via tract (pure Rust - WASM/mobile friendly).
 //!
 //! The vendored model (`models/nmp.onnx`, 230 KB) is Spotify's Basic Pitch
 //! "nmp" network, Apache-2.0, from
@@ -66,7 +66,7 @@ impl BasicPitch {
             .into_decluttered()?
             // Not `into_optimized()`: tract 0.21's kernel-packing pass panics
             // on this tf2onnx graph (opaque-fact assertion in fact.rs). The
-            // decluttered plan runs a 2 s window in ~240 ms — ample.
+            // decluttered plan runs a 2 s window in ~240 ms - ample.
             .into_runnable()?;
         Ok(BasicPitch { plan })
     }

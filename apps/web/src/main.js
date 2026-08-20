@@ -70,7 +70,7 @@ async function transcribeRecording() {
   const total = job.totalWindows;
   while (job.processNextWindow(transcriber)) {
     const percent = Math.round((100 * job.windowsDone) / total);
-    transcribeButton.textContent = `Transcribing… ${percent}%`;
+    transcribeButton.textContent = `Transcribing... ${percent}%`;
     // Yield to the event loop so the page (and the live tuner) stays alive.
     await yieldToEventLoop();
   }
@@ -98,7 +98,7 @@ function noteName(midi) {
 
 // Engraving is delegated to Verovio: the WASM core produces MusicXML
 // (quantization, key detection, grand staff) and Verovio typesets it into
-// A4 SVG pages — the same pages the PDF is built from.
+// A4 SVG pages - the same pages the PDF is built from.
 let verovio = null;
 // The raw SVG string per page from the last render, for the PDF.
 let scorePages = [];
@@ -156,7 +156,7 @@ async function renderTranscription({ midis, onsets, offsets, musicXml, bpm }) {
   }
   summaryEl.textContent =
     `${midis.length} notes over ${duration.toFixed(1)} s · ` +
-    `range ${noteName(low + 1)}–${noteName(high - 1)} · ` +
+    `range ${noteName(low + 1)}-${noteName(high - 1)} · ` +
     `~${Math.round(bpm)} BPM`;
 }
 
@@ -258,7 +258,7 @@ async function start() {
   capture.connect(audioContext.destination);
 
   startButton.remove();
-  detailsEl.textContent = `listening at ${audioContext.sampleRate} Hz…`;
+  detailsEl.textContent = `listening at ${audioContext.sampleRate} Hz...`;
 
   recordButton.hidden = false;
   recordButton.addEventListener("click", () => {
@@ -281,7 +281,7 @@ startButton.addEventListener("click", () => {
 // Upload path: skip the mic entirely and transcribe an existing audio file.
 async function loadAudioFile(file) {
   uploadButton.disabled = true;
-  uploadButton.textContent = "Decoding…";
+  uploadButton.textContent = "Decoding...";
   await ensureWasm();
   const bytes = new Uint8Array(await file.arrayBuffer());
   try {
@@ -291,7 +291,7 @@ async function loadAudioFile(file) {
     lastRecording = { chunks: [decoded.samples()], sampleRate: decoded.sampleRate };
     decoded.free();
   } catch {
-    // Any other format (m4a/ogg/…): the browser decoder, pinned to the
+    // Any other format (m4a/ogg/...): the browser decoder, pinned to the
     // model's 22.05 kHz so the audio is resampled exactly once.
     const decoder = new OfflineAudioContext(1, 1, 22050);
     const buffer = await decoder.decodeAudioData(bytes.buffer);
@@ -300,7 +300,7 @@ async function loadAudioFile(file) {
       sampleRate: buffer.sampleRate,
     };
   }
-  uploadButton.textContent = `Upload audio… (${file.name})`;
+  uploadButton.textContent = `Upload audio... (${file.name})`;
   uploadButton.disabled = false;
   transcribeButton.hidden = false;
   await transcribeRecording();
@@ -313,7 +313,7 @@ uploadInput.addEventListener("change", () => {
   uploadInput.value = "";
   if (!file) return;
   loadAudioFile(file).catch((error) => {
-    uploadButton.textContent = "Upload audio…";
+    uploadButton.textContent = "Upload audio...";
     uploadButton.disabled = false;
     summaryEl.textContent = String(error);
     transcriptionEl.hidden = false;

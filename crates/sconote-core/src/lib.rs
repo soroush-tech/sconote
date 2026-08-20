@@ -1,6 +1,6 @@
 //! Sconote core: monophonic pitch detection from PCM audio frames.
 //!
-//! Platform-agnostic by design — audio capture is the caller's job (Web Audio
+//! Platform-agnostic by design - audio capture is the caller's job (Web Audio
 //! on the web, native audio on mobile). Feed [`PitchEngine::process`] chunks of
 //! f32 samples in [-1, 1] and it emits a [`NoteEvent`] whenever a full analysis
 //! window has accumulated and a clear pitch is present.
@@ -57,7 +57,7 @@ struct SendDetector(McLeodDetector<f32>);
 // SAFETY: every Rc reference lives inside the detector, so moving the whole
 // detector to another thread moves all of them together; no cross-thread
 // aliasing is possible. (`&self` access still requires external
-// synchronization — SendDetector is deliberately not Sync.)
+// synchronization - SendDetector is deliberately not Sync.)
 unsafe impl Send for SendDetector {}
 
 /// Streaming pitch detector (McLeod Pitch Method).
@@ -113,7 +113,7 @@ impl PitchEngine {
         self.window_size
     }
 
-    /// Samples accumulated toward the next analysis window — lets the
+    /// Samples accumulated toward the next analysis window - lets the
     /// tracker mirror the window-completion condition above.
     pub(crate) fn buffered_len(&self) -> usize {
         self.buffer.len()

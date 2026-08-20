@@ -58,7 +58,7 @@ fn fast_tempo_at_the_top_of_the_range_is_detected() {
 
 #[test]
 fn slow_tempo_at_the_bottom_of_the_range_is_detected() {
-    // 50 BPM (1.2 s per beat) — below the old 70 BPM floor, which would have
+    // 50 BPM (1.2 s per beat) - below the old 70 BPM floor, which would have
     // folded this onto its double.
     let onsets: Vec<f64> = (0..24).map(|i| f64::from(i) * 1.2).collect();
     let bpm = estimate_bpm(&notes_at(&onsets));
@@ -77,7 +77,7 @@ fn track_beats_is_uniform_for_a_steady_performance() {
 
 #[test]
 fn track_beats_follows_a_gradual_ritardando() {
-    // Steady quarters, then the spacing grows 4% per beat — every onset
+    // Steady quarters, then the spacing grows 4% per beat - every onset
     // must still have a beat on it, and the grid must end slower.
     let mut onsets = Vec::new();
     let mut t = 0.0;
@@ -105,7 +105,7 @@ fn track_beats_follows_a_gradual_ritardando() {
 #[test]
 fn track_beats_snaps_to_beats_not_subdivisions() {
     // Straight eighths: onsets every 0.25 s, but the beat (folded into the
-    // supported range) is 0.5 s — the grid must step over the off-beats.
+    // supported range) is 0.5 s - the grid must step over the off-beats.
     let onsets: Vec<f64> = (0..32).map(|i| f64::from(i) * 0.25).collect();
     let beats = track_beats(&notes_at(&onsets));
     for pair in beats.windows(2) {

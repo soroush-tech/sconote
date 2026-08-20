@@ -2,10 +2,10 @@
 
 Turn playing into notes. Sconote is a Rust DSP core that does two things:
 
-- **Live tuner** — monophonic pitch detection (McLeod Pitch Method): mic in, note
+- **Live tuner** - monophonic pitch detection (McLeod Pitch Method): mic in, note
   name + cents offset out, per analysis window.
-- **Offline transcription** — polyphonic note transcription (Spotify's Basic
-  Pitch CNN, run in pure Rust via `tract`): a recording in, notes out — and from
+- **Offline transcription** - polyphonic note transcription (Spotify's Basic
+  Pitch CNN, run in pure Rust via `tract`): a recording in, notes out - and from
   those, MIDI, MusicXML and engraved sheet music.
 
 One core, two thin binding crates (WASM for the web, UniFFI for iOS/Android),
@@ -24,8 +24,8 @@ and the apps on top. All DSP and inference is on-device; nothing is uploaded.
 | `crates/sconote-poly` | Polyphonic transcription: decode → resample → CNN → notes → MIDI/MusicXML, plus the scoring harness it's tuned with. |
 | `crates/sconote-wasm` | `wasm-bindgen` wrapper over both engines. |
 | `crates/sconote-ffi` | UniFFI wrapper over both engines (Swift/Kotlin). |
-| `packages/sconote-web` | `@sconote/web` — the `wasm-pack` build of `sconote-wasm`. |
-| `packages/sconote-react-native` | `@sconote/react-native` — turbo-module scaffold; native sources are generated. |
+| `packages/sconote-web` | `@sconote/web` - the `wasm-pack` build of `sconote-wasm`. |
+| `packages/sconote-react-native` | `@sconote/react-native` - turbo-module scaffold; native sources are generated. |
 | `apps/web` | Vite tuner + transcriber app. |
 | `apps/mobile` | Planned, not yet scaffolded. |
 | `examples/` | Reference material and Node scripts for accuracy comparison. |
@@ -34,7 +34,7 @@ and the apps on top. All DSP and inference is on-device; nothing is uploaded.
 
 ```mermaid
 flowchart TD
-    subgraph rust["Rust workspace — Cargo"]
+    subgraph rust["Rust workspace - Cargo"]
         core["sconote-core<br/><i>live monophonic engine</i>"]
         poly["sconote-poly<br/><i>offline polyphonic engine</i>"]
         onnx[("models/nmp.onnx<br/>230 KB, embedded")]
@@ -47,7 +47,7 @@ flowchart TD
         poly --> ffic
     end
 
-    subgraph js["JS workspace — pnpm + turbo"]
+    subgraph js["JS workspace - pnpm + turbo"]
         pkgweb["@sconote/web<br/><i>wasm-pack build</i>"]
         pkgrn["@sconote/react-native<br/><i>ubrn build</i>"]
         appweb["apps/web<br/><i>Vite</i>"]
@@ -60,13 +60,13 @@ flowchart TD
     ffic -->|"JSI + Swift/Kotlin<br/>Linux/macOS/CI only"| pkgrn
 ```
 
-The two binding crates are deliberately logic-free — **any API change must be
+The two binding crates are deliberately logic-free - **any API change must be
 mirrored in both.** 0% test coverage there is accepted; the core must stay
 covered.
 
 ---
 
-## Root folder — build & test workflow
+## Root folder - build & test workflow
 
 `turbo` drives the JS side; the `@sconote/web` build task declares the Rust
 sources as inputs, so touching a `.rs` file correctly invalidates the wasm cache.
@@ -102,21 +102,21 @@ the same artifact ships to WASM and to mobile.
 
 ---
 
-## `crates/sconote-core` — live monophonic engine
+## `crates/sconote-core` - live monophonic engine
 
 Platform-agnostic: **there is no audio capture in the SDK.** Callers feed mono
 f32 samples in `[-1, 1]`; `PitchEngine` accumulates arbitrary-size chunks (Web
 Audio delivers 128 at a time) into 2048-sample analysis windows.
 
 `NoteTracker` wraps the engine and answers two different questions from one
-stream — what to *show* right now, and what to *record* as a played note.
+stream - what to *show* right now, and what to *record* as a played note.
 
 ```mermaid
 flowchart TD
-    IN["PCM chunk<br/>mono f32, −1 to 1"] --> BUF["PitchEngine buffer"]
+    IN["PCM chunk<br/>mono f32, -1 to 1"] --> BUF["PitchEngine buffer"]
     BUF -->|"under window_size"| WAIT["accumulate → None"]
     BUF -->|"window full"| MPM["McLeod Pitch Method<br/>power ≥ 0.15, clarity ≥ 0.7"]
-    MPM -->|no clear pitch| NONE["None — silence / unpitched"]
+    MPM -->|no clear pitch| NONE["None - silence / unpitched"]
     MPM -->|frequency + clarity| NE["NoteEvent<br/>freq · midi · name · cents · clarity"]
 
     NE --> LIVE["TrackerUpdate.live<br/><b>every</b> window → tuner needle"]
@@ -126,14 +126,14 @@ flowchart TD
     SAME -->|no| RESET["new candidate, count = 1"]
     SAME -->|yes| COUNT["count += 1"]
     COUNT -->|"count = 3 consecutive<br/>≈130 ms @ 48 kHz"| STARTED["TrackerUpdate.noteStarted<br/><b>once</b> per held note → history"]
-    Q["quiet_windows += 1"] -->|"3 quiet windows"| REL["release — same pitch<br/>can be confirmed again"]
+    Q["quiet_windows += 1"] -->|"3 quiet windows"| REL["release - same pitch<br/>can be confirmed again"]
 ```
 
 The gate is stricter than the engine's own threshold on purpose: a borderline
 window still moves the tuner needle but never enters the note history.
 
 `McLeodDetector` is `!Send` only because of internal `Rc<RefCell>` scratch
-buffers that never escape it — hence the documented `unsafe impl Send` in
+buffers that never escape it - hence the documented `unsafe impl Send` in
 `lib.rs`. Don't remove it without reading the SAFETY comment.
 
 **Files:** `lib.rs` (`PitchEngine`, `NoteEvent`) · `note.rs` (frequency ⇄ note
@@ -142,24 +142,24 @@ math) · `tracker.rs` (`NoteTracker`) · `tracker_test.rs` / `tracker_spec.rs` �
 
 ---
 
-## `crates/sconote-poly` — offline polyphonic transcription
+## `crates/sconote-poly` - offline polyphonic transcription
 
 The heavy crate. Raw audio bytes in, sheet music out. The vendored
-`models/nmp.onnx` is Spotify's Basic Pitch "nmp" network (Apache-2.0) — its
+`models/nmp.onnx` is Spotify's Basic Pitch "nmp" network (Apache-2.0) - its
 graph *includes* the CQT + harmonic-stacking frontend as Conv ops, so the input
 is raw 22.05 kHz audio, not a spectrogram.
 
 ```mermaid
 flowchart TD
     BYTES["file bytes"] --> SNIFF{"starts with RIFF?"}
-    SNIFF -->|yes| WAV["wav.rs — hound<br/>int or float, any channels"]
-    SNIFF -->|no| MP3["mp3.rs — symphonia<br/>MP3 only"]
+    SNIFF -->|yes| WAV["wav.rs - hound<br/>int or float, any channels"]
+    SNIFF -->|no| MP3["mp3.rs - symphonia<br/>MP3 only"]
     WAV --> MONO["MonoAudio<br/>mono f32 + sample_rate"]
     MP3 --> MONO
     MONO --> RS["resample.rs<br/>windowed sinc, 12 lobes<br/>→ 22 050 Hz"]
 
-    RS --> WIN["transcribe.rs — window<br/>2 s windows, 30-frame overlap,<br/>half-overlap front pad"]
-    WIN --> CNN["model.rs — BasicPitch via tract<br/>per window: 172 frames × 88 pitches"]
+    RS --> WIN["transcribe.rs - window<br/>2 s windows, 30-frame overlap,<br/>half-overlap front pad"]
+    WIN --> CNN["model.rs - BasicPitch via tract<br/>per window: 172 frames × 88 pitches"]
     CNN --> STITCH["stitch: trim 15 frames<br/>off each window edge"]
     STITCH --> ACT["Activations<br/>onset + frame probability matrices"]
 
@@ -175,7 +175,7 @@ flowchart TD
 ```
 
 `Activations` are computed once and cheap to re-extract notes from under
-different thresholds — which is what makes threshold tuning practical.
+different thresholds - which is what makes threshold tuning practical.
 
 ### Two entry points, same pipeline
 
@@ -194,9 +194,9 @@ justified by a measurement harness that also lives in this crate:
 flowchart LR
     REC["real recording<br/>.wav / .mp3"] --> TR["transcribe"]
     REF[".mid ground truth"] --> GT["ground_truth.rs<br/>notes_from_midi<br/><i>channel 10 excluded</i>"]
-    GT -.->|synthetic path| SY["synth.rs — render_notes<br/>harmonic tone + ADSR"]
+    GT -.->|synthetic path| SY["synth.rs - render_notes<br/>harmonic tone + ADSR"]
     SY --> TR
-    TR --> SC["score.rs — score_notes<br/>exact pitch + onset within tolerance<br/><i>offsets ignored: decay tails lie</i>"]
+    TR --> SC["score.rs - score_notes<br/>exact pitch + onset within tolerance<br/><i>offsets ignored: decay tails lie</i>"]
     GT --> SC
     SC --> REP["ScoreReport<br/>matched · missed · spurious"]
     REP --> KNOBS["adjust NoteCreationOptions"]
@@ -213,11 +213,11 @@ cargo run --release -p sconote-poly --example peek     -- <wav> <from_s> <to_s>
 cargo run --release -p sconote-poly --example xml_dump -- <notes.mid> <out.musicxml>
 ```
 
-- **`tune`** — grid-searches thresholds against ground truth, auto-solving the
+- **`tune`** - grid-searches thresholds against ground truth, auto-solving the
   unknown time offset between a recording and the reference.
-- **`ablate`** — which note-creation stage invents the extra notes? Re-extracts
+- **`ablate`** - which note-creation stage invents the extra notes? Re-extracts
   from one cached activation matrix under each combination of heuristics.
-- **`xml_dump`** — the same MusicXML the apps ship, inspectable without a browser.
+- **`xml_dump`** - the same MusicXML the apps ship, inspectable without a browser.
 
 Feature choices are WASM-driven: `midly` without `parallel` (rayon panics on
 wasm32), `symphonia` with MP3 only. **This crate must stay WASM-clean.**
@@ -233,21 +233,21 @@ flowchart TD
         DIST -->|"workspace:*"| VITE["apps/web via Vite"]
     end
 
-    subgraph live["runtime — live tuner"]
+    subgraph live["runtime - live tuner"]
         MIC["getUserMedia<br/>AEC/NS/AGC off"] --> WL["capture-worklet.js<br/>audio thread, 128-sample blocks"]
         WL -->|postMessage| MAIN["main thread"]
-        MAIN --> NT["NoteTracker.process — wasm"]
+        MAIN --> NT["NoteTracker.process - wasm"]
         NT -->|"update.live"| NEEDLE["needle + note name<br/>±50 cents"]
         NT -->|"update.noteStarted"| HIST["note history"]
         MAIN -.->|while recording| CHUNKS["accumulate chunks"]
     end
 
-    subgraph offline["runtime — transcription"]
+    subgraph offline["runtime - transcription"]
         SRC{"source"}
         CHUNKS --> SRC
         UP["file upload"] --> DEC{"WAV or MP3?"}
-        DEC -->|yes| RUSTDEC["decodeAudio — wasm<br/><i>identical samples in every browser</i>"]
-        DEC -->|"no — m4a/ogg/…"| BROWSER["OfflineAudioContext @ 22 050 Hz<br/><i>resampled exactly once</i>"]
+        DEC -->|yes| RUSTDEC["decodeAudio - wasm<br/><i>identical samples in every browser</i>"]
+        DEC -->|"no - m4a/ogg/..."| BROWSER["OfflineAudioContext @ 22 050 Hz<br/><i>resampled exactly once</i>"]
         RUSTDEC --> SRC
         BROWSER --> SRC
         SRC --> JOB["Transcriber.begin → TranscriptionJob"]
@@ -267,12 +267,12 @@ typesets it.
 
 Two `vite.config.js` settings are load-bearing:
 
-- `assetsInlineLimit: 0` — `audioWorklet.addModule` rejects `data:` URLs in some
+- `assetsInlineLimit: 0` - `audioWorklet.addModule` rejects `data:` URLs in some
   browsers, so the worklet must stay a real file.
-- `optimizeDeps.exclude: ["@sconote/web", "verovio"]` — pre-bundling breaks the
-  glue code's `new URL("…_bg.wasm", import.meta.url)` resolution.
+- `optimizeDeps.exclude: ["@sconote/web", "verovio"]` - pre-bundling breaks the
+  glue code's `new URL("..._bg.wasm", import.meta.url)` resolution.
 
-WASM objects are manually freed (`.free()`) after each update — there's no GC
+WASM objects are manually freed (`.free()`) after each update - there's no GC
 across the boundary.
 
 ---
@@ -284,12 +284,12 @@ UniFFI objects must be `Send + Sync`, so the engines sit behind a `Mutex`.
 
 ```mermaid
 flowchart TD
-    FFI["sconote-ffi — uniffi::Object<br/>PitchDetector · NoteTracker · Transcriber"]
+    FFI["sconote-ffi - uniffi::Object<br/>PitchDetector · NoteTracker · Transcriber"]
     FFI -->|"ubrn build android --and-generate"| AND["Rust .so per ABI<br/>+ Kotlin + JSI C++"]
     FFI -->|"ubrn build ios --and-generate"| IOS["Rust staticlib<br/>+ Swift + JSI C++"]
-    AND --> RN["@sconote/react-native<br/>src/ cpp/ android/ ios/ — <i>all generated, gitignored</i>"]
+    AND --> RN["@sconote/react-native<br/>src/ cpp/ android/ ios/ - <i>all generated, gitignored</i>"]
     IOS --> RN
-    RN -.-> MOB["apps/mobile — planned"]
+    RN -.-> MOB["apps/mobile - planned"]
 
     WIN["Windows dev machine"] -.->|"blocked: Smart App Control<br/>kills the ubrn CLI build<br/>(proc-macro DLLs, os error 4551)"| X["✗"]
     CI["GitHub Actions<br/>native-bindings.yml"] -->|ubuntu-latest| AND
@@ -303,7 +303,7 @@ only. The `uniffi` crate version must stay in lockstep with
 
 ---
 
-## `examples/` — accuracy reference material
+## `examples/` - accuracy reference material
 
 A scratch directory (no `package.json`, plain Node scripts) holding a worked
 end-to-end case: Bach BWV 846 as published MP3 + MIDI + PDF, alongside what
@@ -317,14 +317,14 @@ flowchart LR
     ORIG --> CMP["compare.mjs"]
     EX --> CMP
     OUT --> CMP
-    CMP --> M1["sequence mode — LCS<br/><i>CSV has no timestamps</i>"]
-    CMP --> M2["timing mode — pitch + onset tolerance<br/><i>after solving the offset</i>"]
+    CMP --> M1["sequence mode - LCS<br/><i>CSV has no timestamps</i>"]
+    CMP --> M2["timing mode - pitch + onset tolerance<br/><i>after solving the offset</i>"]
     MF["midi-file.mjs<br/><i>hand-rolled SMF reader</i>"] -.-> CMP
 ```
 
 ```bash
-node examples/compare.mjs examples/bach_846/…csv  …/sconote-transcription.json   # sequence
-node examples/compare.mjs examples/bach_846/…mid  …/sconote-transcription.mid    # timing
+node examples/compare.mjs examples/bach_846/...csv  .../sconote-transcription.json   # sequence
+node examples/compare.mjs examples/bach_846/...mid  .../sconote-transcription.mid    # timing
 ```
 
 ---
@@ -342,7 +342,7 @@ node examples/compare.mjs examples/bach_846/…mid  …/sconote-transcription.mi
 ### Environment quirks (Windows)
 
 - **Smart App Control** sometimes blocks freshly compiled build scripts
-  (`os error 4551`) on first run. For workspace `cargo` commands it's transient —
+  (`os error 4551`) on first run. For workspace `cargo` commands it's transient -
   re-run. For the `uniffi-bindgen-react-native` CLI it's permanent; bindings
   generation only works on Linux/macOS/CI.
 - iOS builds require a Mac.

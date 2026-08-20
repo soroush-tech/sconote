@@ -87,7 +87,7 @@ fn sharp_key_material_keeps_sharp_spelling() {
 fn note_is_truncated_at_the_barline() {
     // A whole-measure-crossing note: starts at beat 4, lasts 2 beats.
     let xml = single_part(vec![note(72, 1.5, 2.5)]);
-    // Truncated to one quarter (4 units) at the end of measure 1 — and with
+    // Truncated to one quarter (4 units) at the end of measure 1 - and with
     // the tail dropped, nothing extends into a second measure.
     assert!(xml.contains(
         "<octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type>"
@@ -139,7 +139,7 @@ fn fixed_bpm_states_its_tempo_once() {
 #[test]
 fn tracked_tempo_restates_itself_through_a_ritardando() {
     // Four measures of quarter beats at 100 BPM, then four measures slowing
-    // ~4% per beat — tracked notation must re-state the tempo, lower.
+    // ~4% per beat - tracked notation must re-state the tempo, lower.
     let mut onsets = Vec::new();
     let mut t = 0.0;
     let mut spacing = 0.6;
@@ -182,7 +182,7 @@ fn tracked_tempo_restates_itself_through_a_ritardando() {
 #[test]
 fn subdivided_fast_pulse_folds_to_quarter_barring() {
     // Notes every 0.2 s: the tracker locks a 150 BPM pulse with two events
-    // per beat — an eighth-pulse lock, so notation folds it to 75.
+    // per beat - an eighth-pulse lock, so notation folds it to 75.
     let notes: Vec<TranscribedNote> = (0..32)
         .map(|i| note(72, f64::from(i) * 0.2, f64::from(i) * 0.2 + 0.1))
         .collect();
@@ -198,7 +198,7 @@ fn subdivided_fast_pulse_folds_to_quarter_barring() {
 
 #[test]
 fn a_moderate_pulse_keeps_its_barring() {
-    // ~109 BPM sits inside the quarter-note band — no fold.
+    // ~109 BPM sits inside the quarter-note band - no fold.
     let notes: Vec<TranscribedNote> = (0..16)
         .map(|i| note(72, f64::from(i) * 0.55, f64::from(i) * 0.55 + 0.2))
         .collect();
@@ -234,7 +234,7 @@ fn a_note_held_under_a_running_figure_becomes_its_own_voice() {
 
 #[test]
 fn short_ringing_notes_stay_in_the_running_voice() {
-    // A plain 16th run where every note rings over the next two — none of
+    // A plain 16th run where every note rings over the next two - none of
     // it is a hold, so no voice-3 stream appears.
     let notes: Vec<TranscribedNote> = (0..12)
         .map(|i| note(72, f64::from(i) * 0.125, f64::from(i) * 0.125 + 0.4))
@@ -245,7 +245,7 @@ fn short_ringing_notes_stay_in_the_running_voice() {
 
 #[test]
 fn sixteenth_runs_are_beamed_per_quarter_group() {
-    // Six 16ths from unit 1: engraving beams units 1–3 and 4–6 separately,
+    // Six 16ths from unit 1: engraving beams units 1-3 and 4-6 separately,
     // breaking at the quarter-note boundary.
     let notes: Vec<TranscribedNote> = (0..6)
         .map(|i| {

@@ -5,7 +5,7 @@ import { jsPDF } from "jspdf";
 const PAGE_WIDTH_MM = 210;
 const PAGE_HEIGHT_MM = 297;
 // ~240 DPI: Verovio's glyph <use> structure defeats SVG→vector PDF
-// converters, so pages are rasterized instead — crisp at print size.
+// converters, so pages are rasterized instead - crisp at print size.
 const RASTER_WIDTH_PX = 2000;
 
 /// Turn Verovio's page SVG strings into a paginated A4 PDF.

@@ -106,7 +106,7 @@ fn energy_dip_admits_a_re_strike_at_the_plain_threshold() {
     onsets[10 * PITCH_BINS + 40] = 0.9;
     onsets[30 * PITCH_BINS + 40] = 0.6; // under the strict bar, over the plain one
     set(&mut frames, 10..55, 40, 0.8);
-    // The string decays just before the second strike — still above the
+    // The string decays just before the second strike - still above the
     // frame threshold, so the pitch never stops "sounding".
     set(&mut frames, 26..30, 40, 0.4);
     let notes = notes_from_activations(
@@ -212,7 +212,7 @@ fn inferred_onsets_start_a_note_from_a_sharp_energy_rise() {
         },
     );
     // With every onset at zero the rescale keeps rises at zero, so nothing
-    // can start — unless some real onset exists to scale against.
+    // can start - unless some real onset exists to scale against.
     assert_eq!(notes, Vec::new());
 
     let mut onsets = matrix();
@@ -236,7 +236,7 @@ fn inferred_ripple_does_not_re_articulate_a_sounding_note() {
     let mut onsets = matrix();
     let mut frames = matrix();
     onsets[10 * PITCH_BINS + 40] = 0.9;
-    // The pitch keeps sounding but its frame energy steps up mid-note — the
+    // The pitch keeps sounding but its frame energy steps up mid-note - the
     // kind of ripple a dense texture causes. The inferred-onset rise at
     // frame 25 clears the retrigger bar once rescaled, but the network's own
     // onset there is zero, so the note must stay whole.
@@ -289,7 +289,7 @@ fn simultaneous_octave_above_strike_does_not_re_articulate() {
     let mut frames = matrix();
     onsets[10 * PITCH_BINS + 40] = 0.9;
     set(&mut frames, 10..55, 40, 0.8);
-    // A strong onset ripple mid-note — but the network fired just as hard an
+    // A strong onset ripple mid-note - but the network fired just as hard an
     // octave above at the same moment: that strike explains the ripple.
     onsets[30 * PITCH_BINS + 40] = 0.8;
     onsets[30 * PITCH_BINS + 52] = 0.9;
@@ -318,7 +318,7 @@ fn octave_re_strike_with_a_dominant_own_onset_survives() {
     let mut frames = matrix();
     onsets[10 * PITCH_BINS + 40] = 0.9;
     set(&mut frames, 10..55, 40, 0.8);
-    // The re-strike's own onset outweighs the one above — a real repeat.
+    // The re-strike's own onset outweighs the one above - a real repeat.
     onsets[30 * PITCH_BINS + 40] = 0.95;
     onsets[30 * PITCH_BINS + 52] = 0.9;
     let notes = notes_from_activations(
@@ -342,7 +342,7 @@ fn weak_sub_octave_onset_note_under_a_covering_note_is_dropped() {
     onsets[10 * PITCH_BINS + 52] = 0.9;
     set(&mut frames, 10..40, 52, 0.8);
     // The network also fires an onset at the sub-octave, but its frame
-    // energy is a fraction of the note above — leaked salience.
+    // energy is a fraction of the note above - leaked salience.
     onsets[10 * PITCH_BINS + 40] = 0.9;
     set(&mut frames, 10..40, 40, 0.35);
     let notes = notes_from_activations(
@@ -497,7 +497,7 @@ fn melodia_keeps_a_bass_note_with_its_own_extent() {
     let mut frames = matrix();
     onsets[10 * PITCH_BINS + 52] = 0.9;
     set(&mut frames, 10..25, 52, 0.8);
-    // An octave below, but sounding far beyond the upper note — a real bass
+    // An octave below, but sounding far beyond the upper note - a real bass
     // note, not its shadow.
     set(&mut frames, 5..58, 40, 0.6);
     let notes = notes_from_activations(

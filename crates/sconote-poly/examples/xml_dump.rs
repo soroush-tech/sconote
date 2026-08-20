@@ -1,5 +1,5 @@
-//! Render a transcription MIDI as MusicXML — the same rendering the apps
-//! ship — so score output can be inspected and diffed against an engraved
+//! Render a transcription MIDI as MusicXML - the same rendering the apps
+//! ship - so score output can be inspected and diffed against an engraved
 //! reference without a browser.
 //!
 //! Usage: cargo run --release -p sconote-poly --example xml_dump -- <notes.mid> <out.musicxml>

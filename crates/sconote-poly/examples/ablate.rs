@@ -3,7 +3,7 @@
 //! combination of the two heuristics, scored against MIDI ground truth, with
 //! a count of held notes that got re-triggered mid-sustain.
 //!
-//! Expects a render of the reference MIDI (no time offset to solve for) —
+//! Expects a render of the reference MIDI (no time offset to solve for) -
 //! for a real recording use the `tune` example instead.
 //!
 //! Usage: cargo run --release -p sconote-poly --example ablate -- <render.wav> <reference.mid>
@@ -165,7 +165,7 @@ fn recall_by_silence(reference: &[GroundTruthNote], notes: &[TranscribedNote]) {
 
     let mut totals = [(0_usize, 0_usize); BUCKETS.len()];
     for (index, note) in reference.iter().enumerate() {
-        // Silence since this pitch last stopped — negative when the previous
+        // Silence since this pitch last stopped - negative when the previous
         // note of the same pitch is still sounding, huge on a first hearing.
         let last_offset = reference[..index]
             .iter()
@@ -188,7 +188,7 @@ fn recall_by_silence(reference: &[GroundTruthNote], notes: &[TranscribedNote]) {
 }
 
 /// Notes starting well after the onset of a reference note of the same pitch
-/// that is still sounding — i.e. one held note emitted as several.
+/// that is still sounding - i.e. one held note emitted as several.
 fn retriggered(reference: &[GroundTruthNote], notes: &[TranscribedNote]) -> usize {
     notes
         .iter()

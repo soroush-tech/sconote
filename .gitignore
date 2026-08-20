@@ -4,6 +4,6 @@ node_modules/
 dist/
 # turbo cache
 .turbo/
-# npm artifact — this repo uses pnpm (pnpm-lock.yaml is the real lockfile)
+# npm artifact - this repo uses pnpm (pnpm-lock.yaml is the real lockfile)
 package-lock.json
 /examples

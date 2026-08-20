@@ -18,11 +18,11 @@ const OVERLAP_FRAMES: usize = 30;
 const OVERLAP_SAMPLES: usize = OVERLAP_FRAMES * FFT_HOP;
 const HOP_SAMPLES: usize = WINDOW_SAMPLES - OVERLAP_SAMPLES;
 const TRIM_FRAMES: usize = OVERLAP_FRAMES / 2;
-/// Output frames per second of audio — integer, as in the reference
+/// Output frames per second of audio - integer, as in the reference
 /// (22050 // 256), used only for final output-length trimming.
 const ANNOTATIONS_FPS: usize = MODEL_SAMPLE_RATE as usize / FFT_HOP;
 
-/// Stitched network output for a whole recording — compute once, then
+/// Stitched network output for a whole recording - compute once, then
 /// extract notes under different thresholds cheaply via [`Activations::to_notes`].
 pub struct Activations {
     /// Row-major `[frame][pitch]`, [`PITCH_BINS`] columns.
@@ -100,7 +100,7 @@ impl WindowedTranscription {
     }
 }
 
-/// Run the network over a whole recording (any sample rate — it is
+/// Run the network over a whole recording (any sample rate - it is
 /// resampled to [`MODEL_SAMPLE_RATE`] first).
 pub fn compute_activations(
     audio: &MonoAudio,

@@ -1,5 +1,5 @@
 // Encode captured Float32Array chunks as a WAV blob (format 3: IEEE float,
-// 32-bit, mono) — lossless for the samples the tracker actually saw.
+// 32-bit, mono) - lossless for the samples the tracker actually saw.
 export function encodeWavFloat32(chunks, sampleRate) {
   const sampleCount = chunks.reduce((total, chunk) => total + chunk.length, 0);
   const buffer = new ArrayBuffer(44 + sampleCount * 4);

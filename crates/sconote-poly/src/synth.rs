@@ -2,7 +2,7 @@
 //!
 //! Each note becomes a harmonic-rich tone (fundamental + rolled-off
 //! overtones, sawtooth-like) with a short attack, an exponential decay over
-//! the note, and a short release — close enough to an instrument that a
+//! the note, and a short release - close enough to an instrument that a
 //! transcription engine faces realistic material, while staying fully
 //! deterministic.
 

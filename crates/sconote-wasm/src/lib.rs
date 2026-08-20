@@ -70,13 +70,13 @@ pub struct TrackerUpdate {
 
 #[wasm_bindgen]
 impl TrackerUpdate {
-    /// Raw per-window detection — drive a live display (tuner) with this.
+    /// Raw per-window detection - drive a live display (tuner) with this.
     #[wasm_bindgen(getter)]
     pub fn live(&self) -> Option<NoteEvent> {
         self.inner.live.clone().map(|inner| NoteEvent { inner })
     }
 
-    /// Present at most once per held note — append to a note history.
+    /// Present at most once per held note - append to a note history.
     #[wasm_bindgen(getter, js_name = noteStarted)]
     pub fn note_started(&self) -> Option<NoteEvent> {
         self.inner
@@ -131,7 +131,7 @@ impl DecodedAudio {
     }
 }
 
-/// Decode a WAV or MP3 file's bytes. Errors on any other format — fall
+/// Decode a WAV or MP3 file's bytes. Errors on any other format - fall
 /// back to the browser's decoder for those.
 #[wasm_bindgen(js_name = decodeAudio)]
 pub fn decode_audio(bytes: &[u8]) -> Result<DecodedAudio, JsError> {
@@ -207,16 +207,16 @@ impl TranscriptionJob {
 
     /// Extract the notes under the given thresholds (0.5 / 0.3 / 0.7 / 0.8
     /// / 1.0 / 0.6 are the defaults). The third is the bar an onset must
-    /// clear to re-articulate a pitch that is already sounding — lower it
+    /// clear to re-articulate a pitch that is already sounding - lower it
     /// for material with fast repeated notes. The fourth drops notes that
     /// are the subharmonic shadow of a louder note an octave or twelfth
-    /// above (a note this much quieter, or less, is a ghost) — 0 disables
+    /// above (a note this much quieter, or less, is a ghost) - 0 disables
     /// it, raise it toward 1 for a stricter cleanup. The fifth vetoes a
     /// re-articulation whose onset is explained by a simultaneous strike an
-    /// octave or twelfth above at least this factor as strong — 0 disables
+    /// octave or twelfth above at least this factor as strong - 0 disables
     /// it, raise it above 1 to keep more repeated notes. The sixth drops
     /// notes that are the weak 2nd/3rd harmonic of a note an octave or
-    /// twelfth below — the dominant spurious-note source on real
+    /// twelfth below - the dominant spurious-note source on real
     /// recordings; 0 disables it. Consumes the job.
     pub fn finish(
         &mut self,
@@ -249,7 +249,7 @@ impl TranscriptionJob {
     }
 }
 
-/// Transcribed notes as parallel arrays (same index = same note) — cheap to
+/// Transcribed notes as parallel arrays (same index = same note) - cheap to
 /// move across the JS boundary.
 #[wasm_bindgen]
 pub struct TranscribedNotes {
@@ -280,7 +280,7 @@ impl TranscribedNotes {
         self.offsets.clone()
     }
 
-    /// Encode as a Standard MIDI File (120 BPM grid) — save as `.mid`.
+    /// Encode as a Standard MIDI File (120 BPM grid) - save as `.mid`.
     #[wasm_bindgen(js_name = toMidi)]
     pub fn to_midi(&self) -> Vec<u8> {
         sconote_poly::notes_to_midi_bytes(&self.notes())
