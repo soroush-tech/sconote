@@ -3,11 +3,14 @@
   "private": true,
   "packageManager": "pnpm@10.13.1",
   "scripts": {
+    "prepare": "husky",
     "build": "turbo run build",
     "test": "turbo run test",
     "dev": "turbo run dev"
   },
   "devDependencies": {
+    "ai-watermark-guard": "^0.2.0",
+    "husky": "^9.1.7",
     "turbo": "^2"
   }
 }

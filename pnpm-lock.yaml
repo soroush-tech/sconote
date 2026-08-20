@@ -8,6 +8,12 @@ importers:
 
   .:
     devDependencies:
+      ai-watermark-guard:
+        specifier: ^0.2.0
+        version: 0.2.0
+      husky:
+        specifier: ^9.1.7
+        version: 9.1.7
       turbo:
         specifier: ^2
         version: 2.10.9
@@ -1307,6 +1313,41 @@ packages:
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
 
+  '@soroush.tech/ai-watermark-guard-darwin-arm64@0.2.0':
+    resolution: {integrity: sha512-ssf8ybqz8QW0Wco2kneZLB+mHj+2VqQgmzO5KhgdRIPRaTpx8GEvFX/IaK6BJs5Sjw0+6YtZ7bzhOQuxiIJ32A==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@soroush.tech/ai-watermark-guard-darwin-x64@0.2.0':
+    resolution: {integrity: sha512-0S4JlWK0YU2DJq4zyzTEQ2BJhzeER5yGk3EdSF0WrbAW0+uVg/ND66j7fzjWa684T7f8qpvmcOsinRQSVESeog==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@soroush.tech/ai-watermark-guard-linux-arm64@0.2.0':
+    resolution: {integrity: sha512-ihwNllaq7joyCncYOEzMNQCcxTWCnL9BYcLcllqKXXVFH04So+YWzOZZSiPIpti5i58A3Zpfs1RK2f3mYvWT0A==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@soroush.tech/ai-watermark-guard-linux-x64-musl@0.2.0':
+    resolution: {integrity: sha512-/jSqez4vb4gwej7BGZKnagxqUQrFCi1kDejAmFv3oVHKhDibdL6l6QGAqRhkN49e9UXmbQb6/Ve9SgB5FuiVwQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@soroush.tech/ai-watermark-guard-linux-x64@0.2.0':
+    resolution: {integrity: sha512-uoqhjTuWmsmh6SnU0V0lHwP4DjONKzBmgP5ZJRQqb5HvKQ6PDr9iLJK6usBGXW/EwFDRvTGzmVfWUVcBfubKyg==}
+    cpu: [x64]
+    os: [linux]
+
+  '@soroush.tech/ai-watermark-guard-win32-arm64@0.2.0':
+    resolution: {integrity: sha512-FvZmNVLxk5eW98g72Iyq+O2o8c+mh4xfd7wKr+SKoIOYruWMCIsNTllOo9j9uqQbNGLhkhoeVY7EPRbIS1XMpw==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@soroush.tech/ai-watermark-guard-win32-x64@0.2.0':
+    resolution: {integrity: sha512-b/DoiT4LhiyxKpd8ssNU7SbHUyTujTnIwo5C/PvyF+mFT2yV697vhU1xrMebG5oPkRZzwApvXxiFnxhmR66vIg==}
+    cpu: [x64]
+    os: [win32]
+
   '@turbo/darwin-64@2.10.9':
     resolution: {integrity: sha512-Jh+pTGXLNz8+1tkUU13TI/f+ZOI+OvC4YbHi1H+57iSpLt5DR3xgptd+4sA07RdjdRR/RX/01uQQu2OkbzIefA==}
     cpu: [x64]
@@ -1414,6 +1455,11 @@ packages:
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
+
+  ai-watermark-guard@0.2.0:
+    resolution: {integrity: sha512-58GMcJq7Y67Q8c46cO8hu0psoC6UWezWjUJkruFtbFyELna1OEW4sbD6AY1KGVSycBqWPEZxL5gxP1Odc4mayw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   anser@1.4.10:
     resolution: {integrity: sha512-hCv9AqTQ8ycjpSd3upOJd7vFwW1JaoYQ7tpham03GJ1ca8/65rqn0RpaWpItOAd6ylW9wAw6luXYPJIyPFVOww==}
@@ -2145,6 +2191,11 @@ packages:
   human-signals@2.1.0:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
     engines: {node: '>=10.17.0'}
+
+  husky@9.1.7:
+    resolution: {integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   iconv-lite@0.4.24:
     resolution: {integrity: sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==}
@@ -4982,6 +5033,27 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
+  '@soroush.tech/ai-watermark-guard-darwin-arm64@0.2.0':
+    optional: true
+
+  '@soroush.tech/ai-watermark-guard-darwin-x64@0.2.0':
+    optional: true
+
+  '@soroush.tech/ai-watermark-guard-linux-arm64@0.2.0':
+    optional: true
+
+  '@soroush.tech/ai-watermark-guard-linux-x64-musl@0.2.0':
+    optional: true
+
+  '@soroush.tech/ai-watermark-guard-linux-x64@0.2.0':
+    optional: true
+
+  '@soroush.tech/ai-watermark-guard-win32-arm64@0.2.0':
+    optional: true
+
+  '@soroush.tech/ai-watermark-guard-win32-x64@0.2.0':
+    optional: true
+
   '@turbo/darwin-64@2.10.9':
     optional: true
 
@@ -5082,6 +5154,16 @@ snapshots:
   acorn@8.18.0: {}
 
   agent-base@7.1.4: {}
+
+  ai-watermark-guard@0.2.0:
+    optionalDependencies:
+      '@soroush.tech/ai-watermark-guard-darwin-arm64': 0.2.0
+      '@soroush.tech/ai-watermark-guard-darwin-x64': 0.2.0
+      '@soroush.tech/ai-watermark-guard-linux-arm64': 0.2.0
+      '@soroush.tech/ai-watermark-guard-linux-x64': 0.2.0
+      '@soroush.tech/ai-watermark-guard-linux-x64-musl': 0.2.0
+      '@soroush.tech/ai-watermark-guard-win32-arm64': 0.2.0
+      '@soroush.tech/ai-watermark-guard-win32-x64': 0.2.0
 
   anser@1.4.10: {}
 
@@ -5884,6 +5966,8 @@ snapshots:
       - supports-color
 
   human-signals@2.1.0: {}
+
+  husky@9.1.7: {}
 
   iconv-lite@0.4.24:
     dependencies:
