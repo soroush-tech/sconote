@@ -34,9 +34,9 @@ jobs:
       - run: cargo install cargo-ndk
       - run: pnpm install
       - name: Generate bindings and build Android libraries
-        run: pnpm --filter @sconote/react-native ubrn:android
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+        # ${{ env.* }} can't see runner-machine variables like
+        # ANDROID_NDK_LATEST_HOME, so expand it in the shell instead.
+        run: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" pnpm --filter @sconote/react-native ubrn:android
       - uses: actions/upload-artifact@v4
         with:
           name: sconote-android
