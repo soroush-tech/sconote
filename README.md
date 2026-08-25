@@ -11,6 +11,9 @@ Turn playing into notes. Sconote is a Rust DSP core that does two things:
 One core, two thin binding crates (WASM for the web, UniFFI for iOS/Android),
 and the apps on top. All DSP and inference is on-device; nothing is uploaded.
 
+**Demo:** <https://soroush-tech.github.io/sconote/> - the web app, running
+entirely in your browser.
+
 **Stack:** Rust workspace (edition 2024, stable MSVC) + pnpm/turborepo monorepo
 (Node 26).
 
