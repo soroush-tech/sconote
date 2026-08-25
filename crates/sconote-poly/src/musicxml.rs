@@ -145,20 +145,26 @@ fn part_measures(notes: &[TranscribedNote], beats: &[f64]) -> String {
     let fifths = key_fifths(notes);
     let use_flats = fifths < 0;
 
-    let (treble, bass): (Vec<&TranscribedNote>, Vec<&TranscribedNote>) = notes
+    // The split is at middle C, except that a held note with nothing
+    // sounding below it is the bass line wherever it sits - the left hand
+    // of the C major prelude holds middle C for eight bars.
+    let placed = place_notes(notes, beats);
+    let (treble, bass): (Vec<&Placed>, Vec<&Placed>) = placed
         .iter()
-        .partition(|note| note.midi >= TREBLE_SPLIT_MIDI);
-    // Per staff: a running voice plus a hold voice, so a note sounding
+        .partition(|p| p.note.midi >= TREBLE_SPLIT_MIDI && !is_lowest_hold(p, &placed));
+    // Per staff: a running voice plus hold voices, so a note sounding
     // through other notes keeps its length instead of being clipped into
     // the figuration (the same split engraved scores make).
-    let (treble_run, treble_hold) = split_hold_voice(&treble, beats);
-    let (bass_run, bass_hold) = split_hold_voice(&bass, beats);
+    let (treble_run, treble_holds) = split_hold_voices(&treble);
+    let (bass_run, bass_holds) = split_hold_voices(&bass);
     // (chords, MusicXML voice number, staff)
     let streams = [
         (grid_chords(&treble_run, beats), 1, 1),
-        (grid_chords(&treble_hold, beats), 3, 1),
+        (grid_chords(&treble_holds[0], beats), 3, 1),
+        (grid_chords(&treble_holds[1], beats), 5, 1),
         (grid_chords(&bass_run, beats), 2, 2),
-        (grid_chords(&bass_hold, beats), 4, 2),
+        (grid_chords(&bass_holds[0], beats), 4, 2),
+        (grid_chords(&bass_holds[1], beats), 6, 2),
     ];
 
     let last_unit = streams
@@ -203,14 +209,20 @@ fn part_measures(notes: &[TranscribedNote], beats: &[f64]) -> String {
             let _ = writeln!(xml, "<sound tempo=\"{tempo:.1}\"/>");
             emitted_tempo = tempo;
         }
-        // The running voices always sound (rests fill the gaps); a hold
-        // voice appears only in measures where it has notes.
+        // A voice appears only in measures where it has notes, except that
+        // a staff with nothing at all shows its running voice's rests.
         let start = measure * MEASURE_UNITS;
         let end = start + MEASURE_UNITS;
+        let sounds =
+            |chords: &[GridChord]| chords.iter().any(|c| c.onset >= start && c.onset < end);
+        let staff_sounds = |staff: usize| {
+            streams
+                .iter()
+                .any(|(chords, _, s)| *s == staff && sounds(chords))
+        };
         let mut first = true;
         for (chords, voice, staff) in &streams {
-            let always = *voice <= 2;
-            if !always && !chords.iter().any(|c| c.onset >= start && c.onset < end) {
+            if !sounds(chords) && (*voice > 2 || staff_sounds(*staff)) {
                 continue;
             }
             if !first {
@@ -224,15 +236,21 @@ fn part_measures(notes: &[TranscribedNote], beats: &[f64]) -> String {
     xml
 }
 
-/// A note is a *hold* when it is long (at least a beat and a half) and at
-/// least two other notes of its staff strike while it sounds - the held
-/// bass of an arpeggiated figure, a fugue subject's long tones. Ring-out
-/// alone does not qualify: transcribed offsets are release times, so short
-/// notes routinely bleed over their neighbors.
-fn split_hold_voice<'a>(
-    notes: &[&'a TranscribedNote],
-    beats: &[f64],
-) -> (Vec<&'a TranscribedNote>, Vec<&'a TranscribedNote>) {
+/// A note with its quantized span and hold status.
+struct Placed<'a> {
+    note: &'a TranscribedNote,
+    onset: usize,
+    end: usize,
+    hold: bool,
+}
+
+/// Quantize every note (at least one unit long) and mark the holds. A note
+/// is a *hold* when it is long (at least a beat and a half) and at least
+/// two other notes strike while it sounds - the held bass of an arpeggiated
+/// figure, a fugue subject's long tones. Ring-out alone does not qualify:
+/// transcribed offsets are release times, so short notes routinely bleed
+/// over their neighbors.
+fn place_notes<'a>(notes: &'a [TranscribedNote], beats: &[f64]) -> Vec<Placed<'a>> {
     const HOLD_MIN_UNITS: usize = 6;
     let spans: Vec<(usize, usize)> = notes
         .iter()
@@ -241,25 +259,49 @@ fn split_hold_voice<'a>(
             (onset, grid_units(note.offset_s, beats).max(onset + 1))
         })
         .collect();
-    let is_hold = |i: usize| {
-        let (onset, end) = spans[i];
-        end - onset >= HOLD_MIN_UNITS
-            && spans
+    notes
+        .iter()
+        .zip(&spans)
+        .map(|(note, &(onset, end))| {
+            let strikes = spans
                 .iter()
-                .enumerate()
-                .filter(|&(j, &(other_onset, _))| {
-                    j != i && other_onset > onset && other_onset < end
-                })
-                .count()
-                >= 2
-    };
+                .filter(|&&(other_onset, _)| other_onset > onset && other_onset < end)
+                .count();
+            Placed {
+                note,
+                onset,
+                end,
+                hold: end - onset >= HOLD_MIN_UNITS && strikes >= 2,
+            }
+        })
+        .collect()
+}
+
+/// A hold with no lower note sounding during it: the bass line.
+fn is_lowest_hold(p: &Placed, all: &[Placed]) -> bool {
+    p.hold
+        && !all.iter().any(|other| {
+            other.note.midi < p.note.midi && other.onset < p.end && other.end > p.onset
+        })
+}
+
+/// Split one staff's notes into the running voice and two hold voices. A
+/// hold that overlaps the previous one takes the second hold voice, so
+/// neither is clipped to the other's onset.
+fn split_hold_voices<'a>(
+    notes: &[&Placed<'a>],
+) -> (Vec<&'a TranscribedNote>, [Vec<&'a TranscribedNote>; 2]) {
     let mut running = Vec::new();
-    let mut holds = Vec::new();
-    for (i, &note) in notes.iter().enumerate() {
-        if is_hold(i) {
-            holds.push(note);
+    let mut holds = [Vec::new(), Vec::new()];
+    let mut first_hold_end = 0;
+    for p in notes {
+        if !p.hold {
+            running.push(p.note);
+        } else if p.onset >= first_hold_end {
+            holds[0].push(p.note);
+            first_hold_end = p.end;
         } else {
-            running.push(note);
+            holds[1].push(p.note);
         }
     }
     (running, holds)

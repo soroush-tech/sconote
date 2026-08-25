@@ -193,7 +193,10 @@ fn subdivided_fast_pulse_folds_to_quarter_barring() {
         }],
         None,
     );
-    assert!(xml.contains("<sound tempo=\"75"), "expected folded tempo: {xml}");
+    assert!(
+        xml.contains("<sound tempo=\"75"),
+        "expected folded tempo: {xml}"
+    );
 }
 
 #[test]
@@ -209,27 +212,86 @@ fn a_moderate_pulse_keeps_its_barring() {
         }],
         None,
     );
-    assert!(xml.contains("<sound tempo=\"109"), "expected unfolded tempo");
+    assert!(
+        xml.contains("<sound tempo=\"109"),
+        "expected unfolded tempo"
+    );
 }
 
 #[test]
 fn a_note_held_under_a_running_figure_becomes_its_own_voice() {
     // Held E4 with a 16th run above it (each run note ringing past its
-    // neighbor, as transcriptions do): the hold moves to voice 3 at full
-    // length, the run stays 16ths in voice 1.
-    let mut notes = vec![note(64, 0.0, 2.0)];
-    for i in 0..15 {
-        let onset = 0.125 + f64::from(i) * 0.125;
-        notes.push(note(67 + (i % 3) as u8 * 5, onset, onset + 0.5));
-    }
-    let xml = single_part(notes);
+    // neighbor, as transcriptions do): the hold keeps its full length in
+    // a voice of its own, the run stays 16ths in voice 1.
+    let xml = single_part(run_over(vec![note(64, 0.0, 2.0)]));
     assert!(
         xml.contains(
-            "<step>E</step><octave>4</octave></pitch><duration>16</duration><voice>3</voice><type>whole</type>"
+            "<step>E</step><octave>4</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type>"
         ),
-        "expected the held E4 as a whole note in the hold voice"
+        "expected the held E4 as a whole note in a hold voice"
     );
     assert!(xml.contains("<voice>1</voice><type>16th</type>"));
+}
+
+/// `held` plus a G4-C5-E5 16th figure over it filling the first bar.
+fn run_over(mut held: Vec<TranscribedNote>) -> Vec<TranscribedNote> {
+    for i in 0..15 {
+        let onset = 0.125 + f64::from(i) * 0.125;
+        held.push(note(67 + (i % 3) as u8 * 5, onset, onset + 0.5));
+    }
+    held
+}
+
+#[test]
+fn the_lowest_held_note_is_the_bass_line_even_above_middle_c() {
+    // Middle C held under the figure, as the left hand of the C major
+    // prelude: it belongs on the bass staff although it is not below 60.
+    let xml = single_part(run_over(vec![note(60, 0.0, 2.0)]));
+    assert!(
+        xml.contains(
+            "<step>C</step><octave>4</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><staff>2</staff>"
+        ),
+        "expected the held C4 on the bass staff"
+    );
+    assert!(
+        !xml.contains("<staff>2</staff><beam"),
+        "the figure stays treble"
+    );
+}
+
+#[test]
+fn a_staff_carried_by_a_hold_voice_shows_no_running_voice_rests() {
+    // The bass staff holds only C4: its running voice (2) would add a
+    // whole rest on top of the note, so it is left out of the measure.
+    let xml = single_part(run_over(vec![note(60, 0.0, 2.0)]));
+    assert!(!xml.contains("<voice>2</voice>"));
+}
+
+#[test]
+fn a_hold_above_a_lower_hold_stays_on_the_treble_staff() {
+    // C4 and E4 both held: C4 is the bass line, E4 the treble's own hold
+    // voice - and neither is clipped to the other's onset.
+    let xml = single_part(run_over(vec![note(60, 0.0, 2.0), note(64, 0.125, 2.0)]));
+    assert!(xml.contains(
+        "<step>C</step><octave>4</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><staff>2</staff>"
+    ));
+    assert!(xml.contains(
+        "<step>E</step><octave>4</octave></pitch><duration>12</duration><voice>3</voice><type>half</type><dot/><staff>1</staff>"
+    ));
+}
+
+#[test]
+fn overlapping_holds_on_one_staff_take_separate_voices() {
+    // Two overlapping holds under the figure, both below middle C: the
+    // second would clip the first in a shared voice, so it gets voice 6
+    // (a 15-unit note is not expressible; it rounds down to a dotted half).
+    let xml = single_part(run_over(vec![note(43, 0.0, 2.0), note(59, 0.125, 2.0)]));
+    assert!(xml.contains(
+        "<step>G</step><octave>2</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><staff>2</staff>"
+    ));
+    assert!(xml.contains(
+        "<step>B</step><octave>3</octave></pitch><duration>12</duration><voice>6</voice><type>half</type><dot/><staff>2</staff>"
+    ));
 }
 
 #[test]
@@ -270,9 +332,7 @@ fn an_isolated_sixteenth_is_not_beamed() {
 #[test]
 fn the_score_opens_with_a_metronome_mark() {
     let xml = single_part(vec![note(60, 0.0, 0.5)]);
-    assert!(
-        xml.contains("<metronome><beat-unit>quarter</beat-unit><per-minute>120</per-minute>")
-    );
+    assert!(xml.contains("<metronome><beat-unit>quarter</beat-unit><per-minute>120</per-minute>"));
 }
 
 #[test]
