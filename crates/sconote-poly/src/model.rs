@@ -1,7 +1,16 @@
+// Derived from Spotify's Basic Pitch, basic_pitch/inference.py and
+// basic_pitch/constants.py (https://github.com/spotify/basic-pitch).
+// Copyright 2022 Spotify AB. Licensed under the Apache License, Version 2.0;
+// see ../LICENSE-APACHE and ../NOTICE.
+//
+// MODIFIED: ported from Python to Rust; the model constants and output
+// mapping follow the reference, inference runs through tract instead of
+// TensorFlow. The embedded models/nmp.onnx is unmodified.
+
 //! Basic Pitch CNN inference via tract (pure Rust - WASM/mobile friendly).
 //!
 //! The vendored model (`models/nmp.onnx`, 230 KB) is Spotify's Basic Pitch
-//! "nmp" network, Apache-2.0, from
+//! "nmp" network, Copyright 2022 Spotify AB, Apache-2.0, from
 //! <https://github.com/spotify/basic-pitch/blob/main/basic_pitch/saved_models/icassp_2022/nmp.onnx>.
 //! Its graph *includes* the CQT + harmonic-stacking frontend as Conv ops, so
 //! the input is raw audio: one window of [`WINDOW_SAMPLES`] mono f32 samples

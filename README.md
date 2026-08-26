@@ -360,7 +360,19 @@ node examples/compare.mjs examples/bach_846/...mid  .../sconote-transcription.mi
 
 ## Licence & attribution
 
+Sconote is MIT-licensed (see `LICENSE`).
+
 The bundled `crates/sconote-poly/models/nmp.onnx` is Spotify's
 [Basic Pitch](https://github.com/spotify/basic-pitch) `icassp_2022/nmp.onnx`
-model, Apache-2.0. `note_creation.rs` is a port of that project's
-`output_to_notes_polyphonic`, with five documented deviations.
+model, Copyright 2022 Spotify AB, Apache-2.0. `note_creation.rs` is a port
+of that project's `output_to_notes_polyphonic` (with documented deviations),
+and `transcribe.rs` / `model.rs` follow its `inference.py`. The licence text
+and attribution notices are in `crates/sconote-poly/LICENSE-APACHE` and
+`crates/sconote-poly/NOTICE`; the same notices ship with every distribution
+that embeds the model (`apps/web/public/NOTICE.txt` on the web tuner,
+`packages/sconote-react-native/NOTICE` in the npm package).
+
+The web tuner also bundles [Verovio](https://www.verovio.org) (LGPL-3.0,
+loaded as a separate WASM module) and [jsPDF](https://github.com/parallax/jsPDF)
+(MIT); their licences are in the same `NOTICE.txt`, linked from the page
+footer.

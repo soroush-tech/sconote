@@ -14,6 +14,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "NOTICE",
     "src",
     "lib",
     "android",

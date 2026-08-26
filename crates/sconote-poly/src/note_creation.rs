@@ -1,3 +1,11 @@
+// Derived from Spotify's Basic Pitch, basic_pitch/note_creation.py
+// (https://github.com/spotify/basic-pitch).
+// Copyright 2022 Spotify AB. Licensed under the Apache License, Version 2.0;
+// see ../LICENSE-APACHE and ../NOTICE.
+//
+// MODIFIED: ported from Python to Rust, with the deviations from the
+// reference algorithm documented in the module comment below.
+
 //! Onset/frame probability matrices → discrete notes.
 //!
 //! Faithful port of Basic Pitch's `output_to_notes_polyphonic`
