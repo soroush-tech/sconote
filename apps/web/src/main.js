@@ -68,11 +68,18 @@ async function transcribeRecording() {
   transcriber ??= new Transcriber();
   const job = transcriber.begin(merged, sampleRate);
   const total = job.totalWindows;
-  while (job.processNextWindow(transcriber)) {
-    const percent = Math.round((100 * job.windowsDone) / total);
-    transcribeButton.textContent = `Transcribing... ${percent}%`;
-    // Yield to the event loop so the page (and the live tuner) stays alive.
-    await yieldToEventLoop();
+  const progress = (done) => {
+    transcribeButton.textContent = `Transcribing... ${Math.round((100 * done) / total)}%`;
+  };
+  try {
+    await transcribeInWorkers(job, progress);
+  } catch (error) {
+    console.warn("worker pool failed, transcribing on the main thread", error);
+    while (job.processNextWindow(transcriber)) {
+      progress(job.windowsDone);
+      // Yield to the event loop so the page (and the live tuner) stays alive.
+      await yieldToEventLoop();
+    }
   }
   const notes = job.finish(0.5, 0.3, 0.7, 0.8, 1.0, 0.6);
   job.free();
@@ -88,6 +95,55 @@ async function transcribeRecording() {
   await renderTranscription(lastTranscription);
   transcribeButton.textContent = "Transcribe recording";
   transcribeButton.disabled = false;
+}
+
+// Transcription worker pool, created on first use and kept: each worker
+// loads its own copy of the model, which is the whole setup cost.
+let workers = null;
+
+// Run every window of `job` across the worker pool. Windows are handed out
+// one at a time as workers come free, so the pool stays busy whatever the
+// per-window timing; each result goes straight back into the job.
+function transcribeInWorkers(job, progress) {
+  if (typeof Worker === "undefined") {
+    throw new Error("Web Workers unavailable");
+  }
+  const poolSize = Math.min(8, Math.max(1, (navigator.hardwareConcurrency ?? 2) - 1));
+  workers ??= Array.from(
+    { length: poolSize },
+    () => new Worker(new URL("./transcribe-worker.js", import.meta.url), { type: "module" }),
+  );
+  const total = job.totalWindows;
+  return new Promise((resolve, reject) => {
+    let next = 0;
+    let done = 0;
+    const fail = (error) => {
+      // A broken pool is not reused; the caller falls back to the main thread.
+      for (const worker of workers) worker.terminate();
+      workers = null;
+      reject(error);
+    };
+    const dispatch = (worker) => {
+      if (next >= total) return;
+      const index = next++;
+      const samples = job.windowSamples(index);
+      worker.postMessage({ index, samples }, [samples.buffer]);
+    };
+    for (const worker of workers) {
+      worker.onerror = (event) => fail(event.error ?? new Error(event.message));
+      worker.onmessage = ({ data: { index, output } }) => {
+        job.setWindow(index, output);
+        progress(++done);
+        if (done === total) {
+          resolve();
+        } else {
+          dispatch(worker);
+        }
+      };
+      dispatch(worker);
+    }
+    if (total === 0) resolve();
+  });
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];

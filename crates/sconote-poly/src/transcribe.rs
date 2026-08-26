@@ -1,3 +1,11 @@
+// Derived from Spotify's Basic Pitch, basic_pitch/inference.py
+// (https://github.com/spotify/basic-pitch).
+// Copyright 2022 Spotify AB. Licensed under the Apache License, Version 2.0;
+// see ../LICENSE-APACHE and ../NOTICE.
+//
+// MODIFIED: ported from Python to Rust; windowing, overlap stitching and the
+// frame→time mapping follow the reference, note extraction is this crate's.
+
 //! Full-recording transcription: window the audio, run the network over
 //! each window, stitch the overlapping outputs, and extract notes.
 //!
@@ -31,15 +39,23 @@ pub struct Activations {
     pub n_frames: usize,
 }
 
+/// The network's trimmed output for one window: the frames each side of
+/// the overlap dropped, `[frame][pitch]` row-major.
+pub struct WindowOutput {
+    pub onsets: Vec<f32>,
+    pub frames: Vec<f32>,
+}
+
 /// Incremental transcription: the same computation as
-/// [`compute_activations`], one window per call, so an interactive caller
-/// (e.g. a browser main thread) can update a progress display in between.
+/// [`compute_activations`], one window at a time, so an interactive caller
+/// (e.g. a browser main thread) can update a progress display in between -
+/// or compute windows anywhere and hand the results back in any order.
 pub struct WindowedTranscription {
     padded: Vec<f32>,
     /// Length of the resampled audio, without the front padding.
     audio_len: usize,
-    onsets: Vec<f32>,
-    frames: Vec<f32>,
+    /// One slot per window, filled by [`set_window`](Self::set_window).
+    outputs: Vec<Option<WindowOutput>>,
     next_start: usize,
 }
 
@@ -48,47 +64,77 @@ impl WindowedTranscription {
         let audio = resample(audio, MODEL_SAMPLE_RATE);
         let mut padded = vec![0.0_f32; OVERLAP_SAMPLES / 2];
         padded.extend_from_slice(&audio.samples);
+        let total = padded.len().div_ceil(HOP_SAMPLES);
         WindowedTranscription {
             audio_len: audio.samples.len(),
             padded,
-            onsets: Vec::new(),
-            frames: Vec::new(),
+            outputs: (0..total).map(|_| None).collect(),
             next_start: 0,
         }
     }
 
     pub fn total_windows(&self) -> usize {
-        self.padded.len().div_ceil(HOP_SAMPLES)
+        self.outputs.len()
     }
 
+    /// Windows whose output has been stored.
     pub fn windows_done(&self) -> usize {
-        (self.next_start / HOP_SAMPLES).min(self.total_windows())
+        self.outputs.iter().filter(|o| o.is_some()).count()
     }
 
-    /// Run the network over the next window. Returns whether more windows
-    /// remain, so `while job.process_next_window(&model)? {}` runs them all.
+    /// The samples of window `index`, zero-padded to [`WINDOW_SAMPLES`].
+    pub fn window_samples(&self, index: usize) -> Vec<f32> {
+        let start = index * HOP_SAMPLES;
+        let mut window = vec![0.0_f32; WINDOW_SAMPLES];
+        let available = self.padded.len().saturating_sub(start).min(WINDOW_SAMPLES);
+        window[..available].copy_from_slice(&self.padded[start..start + available]);
+        window
+    }
+
+    /// Run the network over one window (from [`window_samples`](Self::window_samples)).
+    /// Pure: any thread or worker can do it.
+    pub fn predict_window(model: &BasicPitch, window: &[f32]) -> Result<WindowOutput, ModelError> {
+        let prediction = model.predict(window)?;
+        let kept = TRIM_FRAMES * PITCH_BINS..(WINDOW_FRAMES - TRIM_FRAMES) * PITCH_BINS;
+        Ok(WindowOutput {
+            onsets: prediction.onsets[kept.clone()].to_vec(),
+            frames: prediction.notes[kept].to_vec(),
+        })
+    }
+
+    /// Store the output of window `index`.
+    pub fn set_window(&mut self, index: usize, output: WindowOutput) {
+        self.outputs[index] = Some(output);
+    }
+
+    /// Run the network over the next window in order. Returns whether more
+    /// windows remain, so `while job.process_next_window(&model)? {}` runs
+    /// them all.
     pub fn process_next_window(&mut self, model: &BasicPitch) -> Result<bool, ModelError> {
-        if self.next_start >= self.padded.len() {
+        let index = self.next_start / HOP_SAMPLES;
+        if index >= self.total_windows() {
             return Ok(false);
         }
-        let start = self.next_start;
-        let mut window = vec![0.0_f32; WINDOW_SAMPLES];
-        let available = (self.padded.len() - start).min(WINDOW_SAMPLES);
-        window[..available].copy_from_slice(&self.padded[start..start + available]);
-        let prediction = model.predict(&window)?;
-        let kept = TRIM_FRAMES * PITCH_BINS..(WINDOW_FRAMES - TRIM_FRAMES) * PITCH_BINS;
-        self.onsets
-            .extend_from_slice(&prediction.onsets[kept.clone()]);
-        self.frames.extend_from_slice(&prediction.notes[kept]);
+        let output = Self::predict_window(model, &self.window_samples(index))?;
+        self.set_window(index, output);
         self.next_start += HOP_SAMPLES;
-        Ok(self.next_start < self.padded.len())
+        Ok(index + 1 < self.total_windows())
     }
 
-    /// Stitched activations; call once every window has been processed.
+    /// Stitched activations; call once every window has been stored.
+    ///
+    /// # Panics
+    ///
+    /// If a window's output was never set.
     pub fn finish(self) -> Activations {
         let expected_frames = self.audio_len * ANNOTATIONS_FPS / MODEL_SAMPLE_RATE as usize;
-        let mut onsets = self.onsets;
-        let mut frames = self.frames;
+        let mut onsets = Vec::new();
+        let mut frames = Vec::new();
+        for (index, output) in self.outputs.into_iter().enumerate() {
+            let output = output.unwrap_or_else(|| panic!("window {index} was never computed"));
+            onsets.extend_from_slice(&output.onsets);
+            frames.extend_from_slice(&output.frames);
+        }
         let n_frames = (onsets.len() / PITCH_BINS).min(expected_frames);
         onsets.truncate(n_frames * PITCH_BINS);
         frames.truncate(n_frames * PITCH_BINS);
@@ -101,12 +147,25 @@ impl WindowedTranscription {
 }
 
 /// Run the network over a whole recording (any sample rate - it is
-/// resampled to [`MODEL_SAMPLE_RATE`] first).
+/// resampled to [`MODEL_SAMPLE_RATE`] first). With the `parallel` feature
+/// the windows run across all cores; the result is identical either way.
 pub fn compute_activations(
     audio: &MonoAudio,
     model: &BasicPitch,
 ) -> Result<Activations, ModelError> {
     let mut job = WindowedTranscription::new(audio);
+    #[cfg(feature = "parallel")]
+    {
+        use rayon::prelude::*;
+        let outputs: Vec<WindowOutput> = (0..job.total_windows())
+            .into_par_iter()
+            .map(|index| WindowedTranscription::predict_window(model, &job.window_samples(index)))
+            .collect::<Result<_, _>>()?;
+        for (index, output) in outputs.into_iter().enumerate() {
+            job.set_window(index, output);
+        }
+    }
+    #[cfg(not(feature = "parallel"))]
     while job.process_next_window(model)? {}
     Ok(job.finish())
 }

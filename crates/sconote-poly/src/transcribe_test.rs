@@ -65,3 +65,67 @@ fn device_rate_audio_is_resampled_and_transcribed() {
         notes[0].onset_s
     );
 }
+
+#[test]
+fn the_last_window_is_zero_padded() {
+    let note = GroundTruthNote {
+        midi: 60,
+        onset_s: 0.5,
+        offset_s: 3.0,
+    };
+    let audio = render_notes(&[note], MODEL_SAMPLE_RATE);
+    let job = WindowedTranscription::new(&audio);
+    let last = job.window_samples(job.total_windows() - 1);
+    assert_eq!(last.len(), WINDOW_SAMPLES);
+    assert_eq!(
+        last[WINDOW_SAMPLES - 1],
+        0.0,
+        "tail beyond the audio is silence"
+    );
+    assert!(
+        last.iter().any(|&s| s != 0.0),
+        "the window still holds audio"
+    );
+}
+
+#[test]
+fn windows_computed_out_of_order_stitch_to_the_sequential_result() {
+    let note = GroundTruthNote {
+        midi: 60,
+        onset_s: 0.5,
+        offset_s: 3.0,
+    };
+    let audio = render_notes(&[note], MODEL_SAMPLE_RATE);
+    let model = BasicPitch::new().expect("model loads");
+    let sequential = compute_activations(&audio, &model).expect("inference");
+
+    let mut job = WindowedTranscription::new(&audio);
+    for index in (0..job.total_windows()).rev() {
+        let output = WindowedTranscription::predict_window(&model, &job.window_samples(index))
+            .expect("inference");
+        job.set_window(index, output);
+    }
+    assert_eq!(job.windows_done(), job.total_windows());
+    let stitched = job.finish();
+    assert_eq!(stitched.n_frames, sequential.n_frames);
+    assert_eq!(stitched.onsets, sequential.onsets);
+    assert_eq!(stitched.frames, sequential.frames);
+}
+
+#[cfg(feature = "parallel")]
+#[test]
+fn parallel_activations_match_the_sequential_loop() {
+    let note = GroundTruthNote {
+        midi: 60,
+        onset_s: 0.5,
+        offset_s: 3.0,
+    };
+    let audio = render_notes(&[note], MODEL_SAMPLE_RATE);
+    let model = BasicPitch::new().expect("model loads");
+    let parallel = compute_activations(&audio, &model).expect("inference");
+    let mut job = WindowedTranscription::new(&audio);
+    while job.process_next_window(&model).expect("inference") {}
+    let sequential = job.finish();
+    assert_eq!(parallel.onsets, sequential.onsets);
+    assert_eq!(parallel.frames, sequential.frames);
+}

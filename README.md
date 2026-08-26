@@ -184,8 +184,12 @@ different thresholds - which is what makes threshold tuning practical.
 
 | API | Use |
 | --- | --- |
-| `transcribe(&audio, &model, &options)` | Blocking, whole recording. Native / background thread. |
+| `transcribe(&audio, &model, &options)` | Blocking, whole recording. Native / background thread. With the `parallel` feature (on in `sconote-ffi`) the windows run across all cores via rayon. |
 | `WindowedTranscription::new` → `process_next_window` → `finish` | Cooperative. The browser drives one window per tick, yielding to the event loop so the page stays alive. |
+| `WindowedTranscription::new` → `window_samples` / `predict_window` / `set_window` → `finish` | Distributed. Windows are independent: the web app hands them to a pool of Web Workers (each with its own `Transcriber`) and stores the results in any order. |
+
+Windows are independent, so all three produce identical activations; only
+the order of appending matters, and `finish` stitches by window index.
 
 ### Tuning loop
 
@@ -223,7 +227,9 @@ cargo run --release -p sconote-poly --example xml_dump -- <notes.mid> <out.music
 - **`xml_dump`** - the same MusicXML the apps ship, inspectable without a browser.
 
 Feature choices are WASM-driven: `midly` without `parallel` (rayon panics on
-wasm32), `symphonia` with MP3 only. **This crate must stay WASM-clean.**
+wasm32), `symphonia` with MP3 only, and the crate's own `parallel` feature
+(rayon over transcription windows) is off by default - only `sconote-ffi`
+enables it. **This crate must stay WASM-clean.**
 
 ---
 
@@ -254,8 +260,10 @@ flowchart TD
         RUSTDEC --> SRC
         BROWSER --> SRC
         SRC --> JOB["Transcriber.begin → TranscriptionJob"]
-        JOB --> LOOP["processNextWindow + yield<br/>progress bar, page stays responsive"]
-        LOOP --> FIN["finish thresholds → TranscribedNotes"]
+        JOB --> POOL["Web Worker pool - one Transcriber each<br/>windowSamples → predictWindow → setWindow"]
+        JOB -.->|no workers| LOOP["processNextWindow + yield<br/>main-thread fallback"]
+        POOL --> FIN["finish thresholds → TranscribedNotes"]
+        LOOP --> FIN
         FIN --> OUT1["piano roll canvas"]
         FIN --> OUT2["toMidi → .mid"]
         FIN --> OUT3["toMusicXml → Verovio → SVG pages"]

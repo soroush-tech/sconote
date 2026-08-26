@@ -2,7 +2,7 @@
 //! (live tuner/tracker) and `sconote-poly` (offline polyphonic
 //! transcription).
 
-use sconote_poly::{MonoAudio, NoteCreationOptions, WindowedTranscription};
+use sconote_poly::{MonoAudio, NoteCreationOptions, WindowOutput, WindowedTranscription};
 use wasm_bindgen::prelude::*;
 
 /// A pitch detected in one analysis window.
@@ -135,8 +135,7 @@ impl DecodedAudio {
 /// back to the browser's decoder for those.
 #[wasm_bindgen(js_name = decodeAudio)]
 pub fn decode_audio(bytes: &[u8]) -> Result<DecodedAudio, JsError> {
-    let audio =
-        sconote_poly::read_audio_mono(bytes).map_err(|e| JsError::new(&e.to_string()))?;
+    let audio = sconote_poly::read_audio_mono(bytes).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(DecodedAudio {
         samples: audio.samples,
         sample_rate: audio.sample_rate,
@@ -168,6 +167,19 @@ impl Transcriber {
             inner: Some(WindowedTranscription::new(&audio)),
         }
     }
+
+    /// Run the network over one window (from `TranscriptionJob.windowSamples`)
+    /// and return its output as one buffer - onsets then frames - for
+    /// `TranscriptionJob.setWindow`. Pure, so a pool of Web Workers, each
+    /// with its own `Transcriber`, can share a job's windows.
+    #[wasm_bindgen(js_name = predictWindow)]
+    pub fn predict_window(&self, window: &[f32]) -> Result<Vec<f32>, JsError> {
+        let output = WindowedTranscription::predict_window(&self.model, window)
+            .map_err(|e| JsError::new(&e.to_string()))?;
+        let mut data = output.onsets;
+        data.extend_from_slice(&output.frames);
+        Ok(data)
+    }
 }
 
 /// One in-flight transcription. Call `processNextWindow` until it returns
@@ -193,6 +205,37 @@ impl TranscriptionJob {
         self.inner
             .as_ref()
             .map_or(0, WindowedTranscription::windows_done)
+    }
+
+    /// The samples of window `index`, for `Transcriber.predictWindow`.
+    #[wasm_bindgen(js_name = windowSamples)]
+    pub fn window_samples(&self, index: usize) -> Vec<f32> {
+        self.inner
+            .as_ref()
+            .map_or_else(Vec::new, |job| job.window_samples(index))
+    }
+
+    /// Store the output of window `index` (from `Transcriber.predictWindow`).
+    #[wasm_bindgen(js_name = setWindow)]
+    pub fn set_window(&mut self, index: usize, data: &[f32]) -> Result<(), JsError> {
+        let job = self
+            .inner
+            .as_mut()
+            .ok_or_else(|| JsError::new("transcription already finished"))?;
+        if data.len() % 2 != 0 {
+            return Err(JsError::new(
+                "window output must be onsets followed by frames",
+            ));
+        }
+        let (onsets, frames) = data.split_at(data.len() / 2);
+        job.set_window(
+            index,
+            WindowOutput {
+                onsets: onsets.to_vec(),
+                frames: frames.to_vec(),
+            },
+        );
+        Ok(())
     }
 
     /// Run the network over the next window; false once all are done.

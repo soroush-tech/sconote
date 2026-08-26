@@ -12,6 +12,13 @@ midly = { version = "0.5", default-features = false, features = ["alloc", "std"]
 symphonia = { version = "0.5", default-features = false, features = ["mp3"] }
 thiserror = "2"
 tract-onnx = "0.21"
+# Optional, native only: rayon panics on wasm32 (no threads), so the wasm
+# crate must never enable `parallel`; the ffi crate does.
+rayon = { version = "1", optional = true }
+
+[features]
+# Run transcription windows across all cores (compute_activations).
+parallel = ["dep:rayon"]
 
 [dev-dependencies]
 sconote-core = { path = "../sconote-core" }
