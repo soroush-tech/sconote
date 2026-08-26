@@ -249,7 +249,7 @@ fn the_lowest_held_note_is_the_bass_line_even_above_middle_c() {
     let xml = single_part(run_over(vec![note(60, 0.0, 2.0)]));
     assert!(
         xml.contains(
-            "<step>C</step><octave>4</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><staff>2</staff>"
+            "<step>C</step><octave>4</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><stem>down</stem><staff>2</staff>"
         ),
         "expected the held C4 on the bass staff"
     );
@@ -273,24 +273,23 @@ fn a_hold_above_a_lower_hold_stays_on_the_treble_staff() {
     // voice - and neither is clipped to the other's onset.
     let xml = single_part(run_over(vec![note(60, 0.0, 2.0), note(64, 0.125, 2.0)]));
     assert!(xml.contains(
-        "<step>C</step><octave>4</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><staff>2</staff>"
+        "<step>C</step><octave>4</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><stem>down</stem><staff>2</staff>"
     ));
     assert!(xml.contains(
-        "<step>E</step><octave>4</octave></pitch><duration>12</duration><voice>3</voice><type>half</type><dot/><staff>1</staff>"
+        "<step>E</step><octave>4</octave></pitch><duration>3</duration><tie type=\"start\"/><voice>3</voice><type>eighth</type><dot/><stem>down</stem><staff>1</staff>"
     ));
 }
 
 #[test]
 fn overlapping_holds_on_one_staff_take_separate_voices() {
     // Two overlapping holds under the figure, both below middle C: the
-    // second would clip the first in a shared voice, so it gets voice 6
-    // (a 15-unit note is not expressible; it rounds down to a dotted half).
+    // second would clip the first in a shared voice, so it gets voice 6.
     let xml = single_part(run_over(vec![note(43, 0.0, 2.0), note(59, 0.125, 2.0)]));
     assert!(xml.contains(
-        "<step>G</step><octave>2</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><staff>2</staff>"
+        "<step>G</step><octave>2</octave></pitch><duration>16</duration><voice>4</voice><type>whole</type><stem>down</stem><staff>2</staff>"
     ));
     assert!(xml.contains(
-        "<step>B</step><octave>3</octave></pitch><duration>12</duration><voice>6</voice><type>half</type><dot/><staff>2</staff>"
+        "<step>B</step><octave>3</octave></pitch><duration>3</duration><tie type=\"start\"/><voice>6</voice><type>eighth</type><dot/><stem>down</stem><staff>2</staff>"
     ));
 }
 
@@ -353,4 +352,78 @@ fn measures_fill_exactly_with_rests() {
         })
         .sum();
     assert_eq!(total, 16, "voice 1 must fill the measure: {voice1:?}");
+}
+
+#[test]
+fn an_off_beat_hold_is_written_as_tied_pieces_split_at_the_beat() {
+    // E4 from the second 16th to the third beat (7 units): a dotted eighth
+    // up to the beat, tied to a quarter - as engraved, not a rounded value.
+    let xml = single_part(run_over(vec![note(60, 0.0, 2.0), note(64, 0.125, 1.0)]));
+    assert!(xml.contains(
+        "<step>E</step><octave>4</octave></pitch><duration>3</duration><tie type=\"start\"/><voice>3</voice><type>eighth</type><dot/><stem>down</stem><staff>1</staff><notations><tied type=\"start\" orientation=\"under\" placement=\"below\"/></notations></note>"
+    ));
+    assert!(xml.contains(
+        "<step>E</step><octave>4</octave></pitch><duration>4</duration><tie type=\"stop\"/><voice>3</voice><type>quarter</type><stem>down</stem><staff>1</staff><notations><tied type=\"stop\" orientation=\"under\" placement=\"below\"/></notations></note>"
+    ));
+}
+
+#[test]
+fn an_expressible_length_on_the_beat_is_not_tied() {
+    let xml = single_part(vec![note(72, 0.0, 0.75)]);
+    assert!(xml.contains("<duration>6</duration><voice>1</voice><type>quarter</type><dot/>"));
+    assert!(!xml.contains("<tie "));
+}
+
+#[test]
+fn a_length_with_no_single_value_is_tied_from_the_beat() {
+    // 7 units from the downbeat: dotted quarter tied to a 16th.
+    let xml = single_part(vec![note(72, 0.0, 0.875)]);
+    assert!(xml.contains(
+        "<duration>6</duration><tie type=\"start\"/><voice>1</voice><type>quarter</type><dot/>"
+    ));
+    assert!(
+        xml.contains("<duration>1</duration><tie type=\"stop\"/><voice>1</voice><type>16th</type>")
+    );
+}
+
+#[test]
+fn a_figure_dipping_below_middle_c_over_a_bass_hold_stays_treble() {
+    // Bar 16 of the C major prelude: the right hand's A3-C4-F4 figure over
+    // a held F3. A3 is below middle C but sits above the bass line, so it
+    // is engraved on the treble staff with the rest of the figure.
+    let mut notes = vec![note(53, 0.0, 2.0)];
+    for i in 0..12 {
+        let onset = 0.25 + i as f64 * 0.125;
+        notes.push(note([57, 60, 65][i % 3], onset, onset + 0.2));
+    }
+    let xml = single_part(notes);
+    assert!(xml.contains(
+        "<step>A</step><octave>3</octave></pitch><duration>1</duration><voice>1</voice><type>16th</type><staff>1</staff>"
+    ));
+    assert!(!xml.contains("<octave>3</octave></pitch><duration>1</duration><voice>2</voice>"));
+}
+
+#[test]
+fn a_low_run_with_nothing_held_below_it_is_bass() {
+    // A left-hand run alone: no bass line under it, so pitch decides.
+    let notes: Vec<TranscribedNote> = (0..8u8)
+        .map(|i| note(48 + i, f64::from(i) * 0.125, f64::from(i) * 0.125 + 0.1))
+        .collect();
+    let xml = single_part(notes);
+    assert!(xml.contains("<voice>2</voice><type>16th</type><staff>2</staff>"));
+    assert!(
+        !xml.contains("<voice>1</voice><type>16th</type>"),
+        "expected no treble notes"
+    );
+}
+
+#[test]
+fn voices_sharing_a_staff_get_fixed_stems_and_tie_sides() {
+    // E4 held under the figure on the treble staff, which the figure
+    // shares: figure stems up, hold stems down with its tie under. Holds
+    // stem down even alone on their staff (the C4 bass line).
+    let xml = single_part(run_over(vec![note(60, 0.0, 2.0), note(64, 0.125, 1.0)]));
+    assert!(xml.contains("<voice>1</voice><type>16th</type><stem>up</stem><staff>1</staff>"));
+    assert!(xml.contains("<voice>3</voice><type>eighth</type><dot/><stem>down</stem><staff>1</staff><notations><tied type=\"start\" orientation=\"under\" placement=\"below\"/>"));
+    assert!(xml.contains("<voice>4</voice><type>whole</type><stem>down</stem><staff>2</staff>"));
 }

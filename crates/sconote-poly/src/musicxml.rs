@@ -7,8 +7,10 @@
 //! rubato by [`track_beats`] - with `<sound tempo>` marks emitted where the
 //! tracked tempo moves. A Krumhansl-style key detector picks the key
 //! signature (so B♭ material is spelled with flats, not A♯), and each part
-//! is a piano grand staff split at middle C. Time signature is fixed 4/4;
-//! notes are truncated at barlines rather than tied - a readable
+//! is a piano grand staff split by hand ([`staff_is_treble`]). Time
+//! signature is fixed 4/4;
+//! lengths are written as tied note values inside the bar, but notes are
+//! truncated at barlines rather than tied across them - a readable
 //! approximation, not full engraving-grade rhythm transcription.
 
 use std::collections::BTreeMap;
@@ -49,8 +51,10 @@ pub fn parts_to_musicxml(parts: &[ScorePart], bpm: Option<f64>) -> String {
     let beats = match bpm {
         Some(bpm) => uniform_beats(parts, bpm),
         None => {
-            let mut all: Vec<TranscribedNote> =
-                parts.iter().flat_map(|part| part.notes.iter().copied()).collect();
+            let mut all: Vec<TranscribedNote> = parts
+                .iter()
+                .flat_map(|part| part.notes.iter().copied())
+                .collect();
             all.sort_by(|a, b| a.onset_s.total_cmp(&b.onset_s));
             fold_to_notation_pulse(track_beats(&all))
         }
@@ -145,13 +149,15 @@ fn part_measures(notes: &[TranscribedNote], beats: &[f64]) -> String {
     let fifths = key_fifths(notes);
     let use_flats = fifths < 0;
 
-    // The split is at middle C, except that a held note with nothing
-    // sounding below it is the bass line wherever it sits - the left hand
-    // of the C major prelude holds middle C for eight bars.
     let placed = place_notes(notes, beats);
-    let (treble, bass): (Vec<&Placed>, Vec<&Placed>) = placed
-        .iter()
-        .partition(|p| p.note.midi >= TREBLE_SPLIT_MIDI && !is_lowest_hold(p, &placed));
+    let (mut treble, mut bass): (Vec<&Placed>, Vec<&Placed>) = (Vec::new(), Vec::new());
+    for (p, is_treble) in placed.iter().zip(staff_is_treble(&placed)) {
+        if is_treble {
+            treble.push(p);
+        } else {
+            bass.push(p);
+        }
+    }
     // Per staff: a running voice plus hold voices, so a note sounding
     // through other notes keeps its length instead of being clipped into
     // the figuration (the same split engraved scores make).
@@ -220,6 +226,17 @@ fn part_measures(notes: &[TranscribedNote], beats: &[f64]) -> String {
                 .iter()
                 .any(|(chords, _, s)| *s == staff && sounds(chords))
         };
+        // Stems and tie curves are fixed where voices share a staff - the
+        // running voice up and over, holds down and under - so they do not
+        // flip from bar to bar with the renderer's own choice. A voice alone
+        // on its staff is left to the renderer.
+        let shared = |staff: usize| {
+            streams
+                .iter()
+                .filter(|(chords, _, s)| *s == staff && sounds(chords))
+                .count()
+                > 1
+        };
         let mut first = true;
         for (chords, voice, staff) in &streams {
             if !sounds(chords) && (*voice > 2 || staff_sounds(*staff)) {
@@ -229,7 +246,12 @@ fn part_measures(notes: &[TranscribedNote], beats: &[f64]) -> String {
                 let _ = writeln!(xml, "<backup><duration>{MEASURE_UNITS}</duration></backup>");
             }
             first = false;
-            xml.push_str(&voice_xml(chords, measure, *voice, *staff, use_flats));
+            let stem = match (*voice > 2, shared(*staff)) {
+                (true, _) => Some("down"),
+                (false, true) => Some("up"),
+                (false, false) => None,
+            };
+            xml.push_str(&voice_xml(chords, measure, *voice, *staff, stem, use_flats));
         }
         xml.push_str("</measure>\n");
     }
@@ -277,12 +299,31 @@ fn place_notes<'a>(notes: &'a [TranscribedNote], beats: &[f64]) -> Vec<Placed<'a
         .collect()
 }
 
-/// A hold with no lower note sounding during it: the bass line.
-fn is_lowest_hold(p: &Placed, all: &[Placed]) -> bool {
-    p.hold
-        && !all.iter().any(|other| {
-            other.note.midi < p.note.midi && other.onset < p.end && other.end > p.onset
+/// Which staff each note takes - by hand rather than by pitch alone, as
+/// engraved keyboard music does. A hold with nothing sounding below it is
+/// the bass line wherever it sits (the left hand of the C major prelude
+/// holds middle C for eight bars); a running note with a hold sounding
+/// below it is the right hand's figuration over that bass line, however
+/// low it dips. Everything else splits at middle C.
+fn staff_is_treble(placed: &[Placed]) -> Vec<bool> {
+    let sounds_below = |p: &Placed, hold_only: bool| {
+        placed.iter().any(|other| {
+            (other.hold || !hold_only)
+                && other.note.midi < p.note.midi
+                && other.onset < p.end
+                && other.end > p.onset
         })
+    };
+    placed
+        .iter()
+        .map(|p| {
+            if p.hold {
+                p.note.midi >= TREBLE_SPLIT_MIDI && sounds_below(p, false)
+            } else {
+                p.note.midi >= TREBLE_SPLIT_MIDI || sounds_below(p, true)
+            }
+        })
+        .collect()
 }
 
 /// Split one staff's notes into the running voice and two hold voices. A
@@ -379,8 +420,17 @@ fn voice_xml(
     measure: usize,
     voice: usize,
     staff: usize,
+    stem: Option<&str>,
     use_flats: bool,
 ) -> String {
+    let stem_tag = stem.map_or(String::new(), |dir| format!("<stem>{dir}</stem>"));
+    // Ties curve on the outer side of the voice: over a stem-up voice,
+    // under a stem-down one.
+    let curve = match stem {
+        Some("up") => " orientation=\"over\" placement=\"above\"",
+        Some(_) => " orientation=\"under\" placement=\"below\"",
+        None => "",
+    };
     let start = measure * MEASURE_UNITS;
     let end = start + MEASURE_UNITS;
     // Longest expressible length that fits the chord and the measure.
@@ -396,37 +446,86 @@ fn voice_xml(
     for ((chord, fit), beam) in entries.iter().zip(&beams) {
         write_rests(&mut xml, chord.onset - cursor, voice, staff);
         cursor = chord.onset;
-        let (duration, kind, dotted) = note_type(*fit);
-        for (position, &midi) in chord.midis.iter().enumerate() {
-            let (step, alter, octave) = spell(midi, use_flats);
-            let chord_tag = if position > 0 { "<chord/>" } else { "" };
-            let alter_tag = if alter == 0 {
+        let pieces = tied_pieces(chord.onset - start, *fit);
+        for (index, &(duration, kind, dotted)) in pieces.iter().enumerate() {
+            let tie = match (index > 0, index + 1 < pieces.len()) {
+                (false, false) => "",
+                (false, true) => "<tie type=\"start\"/>",
+                (true, true) => "<tie type=\"stop\"/><tie type=\"start\"/>",
+                (true, false) => "<tie type=\"stop\"/>",
+            };
+            let notations = if tie.is_empty() {
                 String::new()
             } else {
-                format!("<alter>{alter}</alter>")
+                format!(
+                    "<notations>{}</notations>",
+                    tie.replace("<tie ", "<tied ")
+                        .replace("\"/>", &format!("\"{curve}/>"))
+                )
             };
-            let dot_tag = if dotted { "<dot/>" } else { "" };
-            // Beams attach to the chord's first note only.
-            let beam_tag = if position == 0 { beam.as_str() } else { "" };
-            let _ = writeln!(
-                xml,
-                "<note>{chord_tag}<pitch><step>{step}</step>{alter_tag}\
-                 <octave>{octave}</octave></pitch>\
-                 <duration>{duration}</duration><voice>{voice}</voice>\
-                 <type>{kind}</type>{dot_tag}<staff>{staff}</staff>{beam_tag}</note>",
-            );
+            for (position, &midi) in chord.midis.iter().enumerate() {
+                let (step, alter, octave) = spell(midi, use_flats);
+                let chord_tag = if position > 0 { "<chord/>" } else { "" };
+                let alter_tag = if alter == 0 {
+                    String::new()
+                } else {
+                    format!("<alter>{alter}</alter>")
+                };
+                let dot_tag = if dotted { "<dot/>" } else { "" };
+                // Beams attach to the chord's first note only.
+                let beam_tag = if position == 0 && index == 0 {
+                    beam.as_str()
+                } else {
+                    ""
+                };
+                let _ = writeln!(
+                    xml,
+                    "<note>{chord_tag}<pitch><step>{step}</step>{alter_tag}\
+                     <octave>{octave}</octave></pitch>\
+                     <duration>{duration}</duration>{tie}<voice>{voice}</voice>\
+                     <type>{kind}</type>{dot_tag}{stem_tag}<staff>{staff}</staff>{beam_tag}\
+                     {notations}</note>",
+                );
+            }
+            cursor += duration;
         }
-        cursor += duration;
     }
     write_rests(&mut xml, end - cursor, voice, staff);
     xml
+}
+
+/// Write `units` from `offset` (units into the measure) as note values to
+/// tie together: a note starting off the beat is split at the next beat,
+/// as engraving does, and each part takes the longest values that fit.
+fn tied_pieces(offset: usize, units: usize) -> Vec<(usize, &'static str, bool)> {
+    let to_beat = (DIVISIONS - offset % DIVISIONS) % DIVISIONS;
+    let mut remaining = units;
+    let mut chunk = if to_beat > 0 && units > to_beat {
+        to_beat
+    } else {
+        units
+    };
+    let mut pieces = Vec::new();
+    while remaining > 0 {
+        let piece = note_type(chunk);
+        pieces.push(piece);
+        chunk -= piece.0;
+        remaining -= piece.0;
+        if chunk == 0 {
+            chunk = remaining;
+        }
+    }
+    pieces
 }
 
 /// Beam markup per chord: runs of equal-length eighths or 16ths that
 /// follow each other gaplessly inside one quarter-note group share a beam
 /// (two beam levels for 16ths), as engraved music groups them.
 fn beam_tags(entries: &[(&GridChord, usize)], measure_start: usize) -> Vec<String> {
-    let written: Vec<usize> = entries.iter().map(|&(_, fit)| note_type(fit).0).collect();
+    let written: Vec<usize> = entries
+        .iter()
+        .map(|&(chord, fit)| tied_pieces(chord.onset - measure_start, fit)[0].0)
+        .collect();
     let joined = |i: usize| {
         i > 0
             && written[i] == written[i - 1]
